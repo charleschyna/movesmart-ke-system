@@ -1,0 +1,232 @@
+import requests
+import logging
+import math
+from django.conf import settings
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+import json
+
+logger = logging.getLogger(__name__)
+
+class TomTomService:
+    """Service for integrating with TomTom API to fetch real-time traffic data."""
+    
+    def __init__(self):
+        self.api_key = settings.TOMTOM_API_KEY
+        self.base_url = "https://api.tomtom.com"
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        })
+    
+    def get_traffic_flow(self, lat: float, lon: float, zoom: int = 12) -> Dict[str, Any]:
+        """
+        Fetch traffic flow data for a specific location.
+        
+        Args:
+            lat: Latitude coordinate
+            lon: Longitude coordinate  
+            zoom: Map zoom level (affects detail level)
+            
+        Returns:
+            Dictionary containing traffic flow data
+        """
+        url = f"{self.base_url}/traffic/services/4/flowSegmentData/absolute/10/json"
+        
+        params = {
+            'key': self.api_key,
+            'point': f"{lat},{lon}",
+            'unit': 'KMPH',
+            'openLr': 'false'
+        }
+        
+        try:
+            response = self.session.get(url, params=params, timeout=10) # 10-second timeout
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Error fetching traffic flow data: {e}")
+            return {}
+    
+    def get_traffic_incidents(self, bbox: str, category_filter: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Fetch traffic incidents for a bounding box area.
+        
+        Args:
+            bbox: Bounding box in format "minLon,minLat,maxLon,maxLat"
+            category_filter: Optional filter for incident categories
+            
+        Returns:
+            Dictionary containing traffic incidents data
+        """
+        # TomTom incidents API endpoint format - corrected URL structure
+        url = f"{self.base_url}/traffic/services/5/incidentDetails"
+        
+        params = {
+            'key': self.api_key,
+            'bbox': bbox,
+            'fields': '{incidents{type,geometry{type,coordinates},properties{id,iconCategory,magnitudeOfDelay,events{description,code,iconCategory},startTime,endTime,from,to,length,delay,roadNumbers,timeValidity,probabilityOfOccurrence,numberOfReports,lastReportTime}}}',
+            'language': 'en-US',
+            'timeValidityFilter': 'present'
+        }
+        
+        # Add category filter if provided
+        if category_filter:
+            params['categoryFilter'] = category_filter
+        
+        try:
+            response = self.session.get(url, params=params, timeout=15) # 15-second timeout
+            response.raise_for_status()
+            return response.json()
+        except json.JSONDecodeError:
+            logger.error(f"Failed to decode JSON from TomTom API. Status: {response.status_code}, Response: {response.text}")
+            return {}
+        except requests.RequestException as e:
+            logger.error(f"Error fetching traffic incidents: {e}")
+            logger.error(f"URL: {url}")
+            logger.error(f"Params: {params}")
+            return {}
+    
+    def get_traffic_flow_tile(self, x: int, y: int, zoom: int, style: str = "absolute") -> Optional[bytes]:
+        """
+        Fetch traffic flow tile data.
+        
+        Args:
+            x: Tile X coordinate
+            y: Tile Y coordinate
+            zoom: Zoom level
+            style: Traffic style ("absolute", "relative", "relative-delay")
+            
+        Returns:
+            Tile data as bytes or None if failed
+        """
+        url = f"{self.base_url}/traffic/map/4/tile/flow/{style}/{zoom}/{x}/{y}.png"
+        
+        params = {
+            'key': self.api_key
+        }
+        
+        try:
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            return response.content
+        except requests.RequestException as e:
+            logger.error(f"Error fetching traffic flow tile: {e}")
+            return None
+    
+    def get_city_traffic_summary(self, city_center: tuple, radius_km: float = 10) -> Dict[str, Any]:
+        """
+        Get a simplified traffic summary for the frontend dashboard.
+        
+        Args:
+            city_center: Tuple of (lat, lon) for the city center.
+            radius_km: Radius in kilometers to define the area.
+            
+        Returns:
+            A dictionary formatted for the dashboard with congestion, travel time, incidents, and AI forecast.
+        """
+        logger.info(f"Fetching city traffic summary for {city_center} with radius {radius_km}km")
+        
+        lat, lon = city_center
+        
+        # Calculate bounding box for incidents API
+        lat_change = radius_km / 111.32
+        lon_change = radius_km / (111.32 * abs(math.cos(math.radians(lat))))
+        bbox = f"{lon - lon_change},{lat - lat_change},{lon + lon_change},{lat + lat_change}"
+        
+        # Fetch data from TomTom APIs
+        logger.info("Fetching TomTom traffic flow data...")
+        flow_data = self.get_traffic_flow(lat, lon)
+        logger.info(f"Received flow data: {'present' if flow_data else 'empty'}")
+
+        logger.info("Fetching TomTom traffic incidents data...")
+        incidents_data = self.get_traffic_incidents(bbox)
+        logger.info(f"Received incidents data: {'present' if incidents_data else 'empty'}")
+        
+        # Initialize default values
+        congestion_level = 0
+        avg_travel_time = 0  # Per 10km
+        live_incidents = 0
+        
+        # Process flow data
+        if flow_data and 'flowSegmentData' in flow_data:
+            segment = flow_data['flowSegmentData']
+            current_speed = segment.get('currentSpeed', 0)
+            free_flow_speed = segment.get('freeFlowSpeed', 1) # Avoid division by zero
+            
+            if free_flow_speed > 0:
+                # Congestion is the percentage of speed reduction from free flow
+                congestion_level = round(max(0, (1 - (current_speed / free_flow_speed)) * 100))
+            
+            # Average travel time is reported in seconds per meter in some APIs, here it's per segment
+            # Let's calculate travel time per 10km based on current speed
+            if current_speed > 0:
+                avg_travel_time = round((10 / current_speed) * 60) # Time in minutes to travel 10km
+            else:
+                # If speed is 0, travel time is effectively infinite, show a high number
+                avg_travel_time = 99
+                
+        # Process incidents data
+        if incidents_data and 'incidents' in incidents_data:
+            live_incidents = len(incidents_data['incidents'])
+            
+        # Generate AI forecast
+        ai_forecast = self._generate_ai_forecast(congestion_level, live_incidents)
+        
+        # Format data for the frontend
+        dashboard_data = {
+            "congestionLevel": congestion_level,
+            "avgTravelTime": avg_travel_time,
+            "liveIncidents": live_incidents,
+            "aiForecast": ai_forecast
+        }
+        
+        logger.info(f"Returning dashboard data: {dashboard_data}")
+        return dashboard_data
+
+    def _generate_ai_forecast(self, congestion_level: float, live_incidents: int) -> str:
+        """Generate a simple AI forecast based on traffic data."""
+        if congestion_level > 75 or live_incidents > 10:
+            return "Expect major delays. Consider alternative routes or travel times."
+        elif congestion_level > 50 or live_incidents > 5:
+            return "Heavy traffic reported. Plan for extra travel time."
+        elif congestion_level > 25:
+            return "Moderate traffic conditions. Minor delays possible."
+        else:
+            return "Traffic is flowing smoothly. Have a safe trip!"
+    
+    def get_route_traffic(self, start_lat: float, start_lon: float, 
+                         end_lat: float, end_lon: float) -> Dict[str, Any]:
+        """
+        Get traffic information for a specific route.
+        
+        Args:
+            start_lat: Starting latitude
+            start_lon: Starting longitude
+            end_lat: Ending latitude
+            end_lon: Ending longitude
+            
+        Returns:
+            Dictionary with route traffic data
+        """
+        url = f"{self.base_url}/routing/1/calculateRoute/{start_lat},{start_lon}:{end_lat},{end_lon}/json"
+        
+        params = {
+            'key': self.api_key,
+            'traffic': 'true',
+            'travelMode': 'car',
+            'routeType': 'fastest'
+        }
+        
+        try:
+            response = self.session.get(url, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Error fetching route traffic data: {e}")
+            return {}
+
+
+# Singleton instance
+tomtom_service = TomTomService()
