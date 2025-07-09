@@ -308,7 +308,7 @@ const NewDashboard: React.FC = () => {
             onClick={async () => {
               try {
                 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                const response = await fetch(`${apiUrl}/api/traffic/data/city_summary/?city=${selectedCity.id}`);
+                const response = await fetch(`${apiUrl}/api/traffic/reports/city_summary/?city=${selectedCity.id}`);
                 const data = await response.json();
                 console.log('Raw API Response:', data);
                 alert('Check console for raw API response');

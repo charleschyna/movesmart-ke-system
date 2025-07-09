@@ -35,6 +35,7 @@ import IncidentReporting from '../features/IncidentReporting';
 import NotificationCenter from '../features/NotificationCenter';
 import Settings from '../features/Settings';
 import StatsCards from './StatsCards';
+import TrafficReportSection from '../features/TrafficReportSection';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -705,38 +706,9 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right Sidebar */}
+                {/* Right Sidebar - Enhanced Traffic Report Section */}
                 <div className="space-y-6">
-                  {/* Location Search */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="relative mb-4">
-                      <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Enter location or address"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      />
-                    </div>
-                    <button className="w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
-                      Generate Traffic Report
-                    </button>
-                  </div>
-
-                  {/* Ready to Start */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Start</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Set a location and click "Generate Traffic Report" to get a detailed summary.
-                    </p>
-                  </div>
-
-                  {/* Report History */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Report History</h3>
-                    <p className="text-sm text-gray-600">
-                      No reports saved yet. Generate a new report to see it here.
-                    </p>
-                  </div>
+                  <TrafficReportSection selectedCity={selectedCity} />
                 </div>
               </div>
             </div>

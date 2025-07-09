@@ -222,6 +222,63 @@ class ApiService {
     }
   }
 
+  // Traffic Report Methods
+  async generateTrafficReport(data: {
+    location: string;
+    latitude?: number;
+    longitude?: number;
+    report_type?: string;
+    use_current_location?: boolean;
+  }): Promise<APIResponse<any>> {
+    try {
+      const response = await this.api.post(API_ENDPOINTS.TRAFFIC_REPORT_GENERATE, data);
+      return {
+        success: true,
+        message: 'Traffic report generated successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to generate traffic report:', error);
+      throw new Error(error.response?.data?.message || 'Failed to generate traffic report');
+    }
+  }
+
+  async generateDetailedTrafficReport(data: {
+    location: string;
+    latitude?: number;
+    longitude?: number;
+    report_type?: string;
+    radius_km?: number;
+    use_current_location?: boolean;
+  }): Promise<APIResponse<any>> {
+    try {
+      const response = await this.api.post(API_ENDPOINTS.TRAFFIC_REPORT_DETAILED, data);
+      return {
+        success: true,
+        message: 'Detailed traffic report generated successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to generate detailed traffic report:', error);
+      throw new Error(error.response?.data?.message || 'Failed to generate detailed traffic report');
+    }
+  }
+
+  async getTrafficReports(limit?: number): Promise<APIResponse<any[]>> {
+    try {
+      const params = limit ? `?limit=${limit}` : '';
+      const response = await this.api.get(`${API_ENDPOINTS.TRAFFIC_REPORTS}${params}`);
+      return {
+        success: true,
+        message: 'Traffic reports fetched successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch traffic reports:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch traffic reports');
+    }
+  }
+
   // Route Methods with fallback
   async optimizeRoute(
     start: { lat: number; lng: number },
@@ -487,8 +544,44 @@ class ApiService {
     }
   }
 
+
+  // Reverse Geocode Method
+  async reverseGeocode(latitude: number, longitude: number): Promise<{ address: string }> {
+    try {
+      const apiKey = import.meta.env.VITE_TOMTOM_API_KEY;
+      if (!apiKey) {
+        throw new Error('TomTom API key not found');
+      }
+
+      const response = await this.api.get(
+        `https://api.tomtom.com/search/2/reverseGeocode/${latitude},${longitude}.json?key=${apiKey}&language=en`
+      );
+      
+      if (response.data.results && response.data.results.length > 0) {
+        const result = response.data.results[0];
+        return {
+          address: result.address.freeformAddress || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+        };
+      }
+      
+      throw new Error('No results found');
+    } catch (error: any) {
+      console.warn('Reverse geocoding failed:', error.message);
+      // Fallback to coordinates
+      return {
+        address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+      };
+    }
+  }
+
   // Mock data methods for development
 }
 
+// Export singleton instance
 export const apiService = new ApiService();
+
+// Export the class for direct instantiation if needed
+export { ApiService };
+
+// Also export as default for compatibility
 export default apiService;

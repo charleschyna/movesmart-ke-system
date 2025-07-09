@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import json
 
 
 class TrafficData(models.Model):
@@ -76,3 +77,45 @@ class Route(models.Model):
     
     def __str__(self):
         return f"{self.name}: {self.start_location} to {self.end_location}"
+
+
+class TrafficReport(models.Model):
+    """Model for storing generated traffic reports with AI analysis."""
+    
+    REPORT_TYPE_CHOICES = [
+        ('location', 'Location Report'),
+        ('route', 'Route Report'),
+        ('city', 'City Report'),
+    ]
+    
+    title = models.CharField(max_length=255)
+    report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, default='location')
+    location = models.CharField(max_length=255)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    
+    # Traffic data from TomTom API
+    traffic_data = models.JSONField(help_text="Raw traffic data from TomTom API")
+    
+    # AI-generated analysis
+    ai_analysis = models.TextField(help_text="AI-generated traffic analysis")
+    ai_recommendations = models.TextField(help_text="AI-generated recommendations")
+    
+    # Report metadata
+    congestion_level = models.IntegerField(help_text="Congestion level percentage (0-100)")
+    avg_speed = models.FloatField(help_text="Average speed in km/h")
+    incident_count = models.IntegerField(help_text="Number of incidents in the area")
+    
+    # User association (optional for now)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Traffic Report'
+        verbose_name_plural = 'Traffic Reports'
+    
+    def __str__(self):
+        return f"{self.title} - {self.location} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"

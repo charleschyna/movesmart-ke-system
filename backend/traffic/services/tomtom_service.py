@@ -115,6 +115,133 @@ class TomTomService:
             logger.error(f"Error fetching traffic flow tile: {e}")
             return None
     
+    def get_detailed_traffic_report(self, city_center: tuple, radius_km: float = 10) -> Dict[str, Any]:
+        """
+        Get comprehensive traffic data for detailed report generation.
+        
+        Args:
+            city_center: Tuple of (lat, lon) for the city center.
+            radius_km: Radius in kilometers to define the area.
+            
+        Returns:
+            A dictionary with detailed traffic data including roads, incidents, and flow data.
+        """
+        logger.info(f"Fetching detailed traffic report for {city_center} with radius {radius_km}km")
+        
+        lat, lon = city_center
+        
+        # Convert to float to handle Decimal types from Django models
+        lat = float(lat)
+        lon = float(lon)
+        
+        # Calculate bounding box for incidents API
+        lat_change = radius_km / 111.32
+        lon_change = radius_km / (111.32 * abs(math.cos(math.radians(lat))))
+        bbox = f"{lon - lon_change},{lat - lat_change},{lon + lon_change},{lat + lat_change}"
+        
+        # Fetch multiple data points around the area for comprehensive coverage
+        traffic_points = self._generate_traffic_sampling_points(lat, lon, radius_km)
+        
+        # Fetch detailed traffic flow data for multiple points
+        flow_data_points = []
+        for point_lat, point_lon in traffic_points:
+            flow_data = self.get_traffic_flow(point_lat, point_lon)
+            if flow_data:
+                flow_data['coordinates'] = [point_lat, point_lon]
+                flow_data_points.append(flow_data)
+        
+        # Fetch incidents data
+        incidents_data = self.get_traffic_incidents(bbox)
+        
+        # Fetch route data for major roads
+        route_data = self._get_major_routes_traffic(lat, lon, radius_km)
+        
+        return {
+            'center_coordinates': [lat, lon],
+            'radius_km': radius_km,
+            'bbox': bbox,
+            'traffic_flow_points': flow_data_points,
+            'incidents': incidents_data,
+            'major_routes': route_data,
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def _generate_traffic_sampling_points(self, center_lat: float, center_lon: float, radius_km: float) -> List[tuple]:
+        """
+        Generate sampling points around the center for comprehensive traffic analysis.
+        """
+        points = [(center_lat, center_lon)]  # Center point
+        
+        # Add points in 8 directions around the center
+        angles = [0, 45, 90, 135, 180, 225, 270, 315]
+        for angle in angles:
+            # Calculate point at 60% of radius in each direction
+            angle_rad = math.radians(angle)
+            lat_offset = (radius_km * 0.6) * math.cos(angle_rad) / 111.32
+            lon_offset = (radius_km * 0.6) * math.sin(angle_rad) / (111.32 * abs(math.cos(math.radians(center_lat))))
+            
+            new_lat = center_lat + lat_offset
+            new_lon = center_lon + lon_offset
+            points.append((new_lat, new_lon))
+        
+        return points
+    
+    def _get_major_routes_traffic(self, center_lat: float, center_lon: float, radius_km: float) -> List[Dict[str, Any]]:
+        """
+        Get traffic data for major routes in the area.
+        """
+        # Define some major routes for Nairobi area (can be expanded)
+        major_routes = [
+            {'name': 'Uhuru Highway', 'start': (-1.2921, 36.8219), 'end': (-1.3073, 36.8219)},
+            {'name': 'Waiyaki Way', 'start': (-1.2651, 36.8048), 'end': (-1.2434, 36.7073)},
+            {'name': 'Ngong Road', 'start': (-1.2921, 36.8219), 'end': (-1.3670, 36.7756)},
+            {'name': 'Thika Road', 'start': (-1.2634, 36.8309), 'end': (-1.0332, 37.0692)},
+            {'name': 'Mombasa Road', 'start': (-1.2921, 36.8219), 'end': (-1.3670, 36.8950)}
+        ]
+        
+        route_traffic_data = []
+        for route in major_routes:
+            # Check if route is within our analysis area
+            if self._is_route_in_area(route, center_lat, center_lon, radius_km):
+                route_traffic = self.get_route_traffic(
+                    route['start'][0], route['start'][1],
+                    route['end'][0], route['end'][1]
+                )
+                if route_traffic:
+                    route_traffic['route_name'] = route['name']
+                    route_traffic_data.append(route_traffic)
+        
+        return route_traffic_data
+    
+    def _is_route_in_area(self, route: Dict[str, Any], center_lat: float, center_lon: float, radius_km: float) -> bool:
+        """
+        Check if a route intersects with the analysis area.
+        """
+        start_lat, start_lon = route['start']
+        end_lat, end_lon = route['end']
+        
+        # Simple distance check - if either start or end is within radius
+        start_distance = self._calculate_distance(center_lat, center_lon, start_lat, start_lon)
+        end_distance = self._calculate_distance(center_lat, center_lon, end_lat, end_lon)
+        
+        return start_distance <= radius_km or end_distance <= radius_km
+    
+    def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calculate distance between two points using Haversine formula.
+        """
+        R = 6371  # Earth's radius in km
+        
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lon = math.radians(lon2 - lon1)
+        
+        a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        return R * c
+
     def get_city_traffic_summary(self, city_center: tuple, radius_km: float = 10) -> Dict[str, Any]:
         """
         Get a simplified traffic summary for the frontend dashboard.
