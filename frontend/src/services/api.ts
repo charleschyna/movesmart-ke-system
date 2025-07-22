@@ -10,13 +10,14 @@ import {
   SimulationResult, 
   SustainabilityData 
 } from '../types';
-import { API_ENDPOINTS, STORAGE_KEYS } from '../constants';
+import { API_BASE_URL, API_ENDPOINTS, STORAGE_KEYS } from '../constants';
 
 class ApiService {
   private api: AxiosInstance;
   
   constructor() {
     this.api = axios.create({
+      baseURL: API_BASE_URL,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -51,9 +52,9 @@ class ApiService {
   }
 
   // Authentication Methods
-  async login(email: string, password: string): Promise<APIResponse<{ user: User; token: string }>> {
+  async login(username: string, password: string): Promise<APIResponse<{ user: User; token: string }>> {
     try {
-      const response = await this.api.post(API_ENDPOINTS.AUTH.LOGIN, { email, password });
+      const response = await this.api.post(API_ENDPOINTS.AUTH.LOGIN, { username, password });
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
@@ -82,6 +83,15 @@ class ApiService {
     } finally {
       localStorage.removeItem(STORAGE_KEYS.TOKEN);
       localStorage.removeItem(STORAGE_KEYS.USER);
+    }
+  }
+
+  async googleLogin(googleToken: string): Promise<APIResponse<{ user: User; token: string; is_new_user: boolean }>> {
+    try {
+      const response = await this.api.post(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, { token: googleToken });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Google login failed');
     }
   }
 
@@ -115,43 +125,9 @@ class ApiService {
     }
   }
 
-  // Fallback geocoding using basic location mapping
+  // Fallback geocoding - throw error if TomTom fails
   private fallbackGeocode(query: string): { lat: number; lng: number } {
-    const locationMap: Record<string, { lat: number; lng: number }> = {
-      'nairobi': { lat: -1.2921, lng: 36.8219 },
-      'westlands': { lat: -1.2676, lng: 36.8108 },
-      'karen': { lat: -1.3197, lng: 36.6859 },
-      'kiambu': { lat: -1.1708, lng: 36.8356 },
-      'thika': { lat: -1.0332, lng: 37.0694 },
-      'kikuyu': { lat: -1.2463, lng: 36.6619 },
-      'ruiru': { lat: -1.1455, lng: 36.9618 },
-      'limuru': { lat: -1.1138, lng: 36.6424 },
-      'jkia': { lat: -1.3192, lng: 36.9276 },
-      'cbd': { lat: -1.2841, lng: 36.8155 },
-      'upperhill': { lat: -1.2962, lng: 36.8174 },
-      'kilimani': { lat: -1.2912, lng: 36.7871 },
-      'kawangware': { lat: -1.2728, lng: 36.7341 },
-      'kasarani': { lat: -1.2213, lng: 36.8969 },
-      'embakasi': { lat: -1.3167, lng: 36.8926 }
-    };
-
-    const normalizedQuery = query.toLowerCase().trim();
-    
-    // Try exact match first
-    if (locationMap[normalizedQuery]) {
-      return locationMap[normalizedQuery];
-    }
-
-    // Try partial match
-    for (const [location, coords] of Object.entries(locationMap)) {
-      if (normalizedQuery.includes(location) || location.includes(normalizedQuery)) {
-        return coords;
-      }
-    }
-
-    // Default to Nairobi CBD if no match found
-    console.warn(`Location "${query}" not found in fallback map, defaulting to Nairobi CBD`);
-    return locationMap['cbd'];
+    throw new Error(`Unable to geocode location: ${query}. Please check the location name and try again.`);
   }
 
   // Traffic Data Methods

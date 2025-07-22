@@ -5,11 +5,12 @@ from django.conf import settings
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import json
+import time
 
 logger = logging.getLogger(__name__)
 
 class TomTomService:
-    """Service for integrating with TomTom API to fetch real-time traffic data."""
+    """Enhanced service for integrating with TomTom API to fetch real-time traffic data."""
     
     def __init__(self):
         self.api_key = settings.TOMTOM_API_KEY
@@ -17,8 +18,47 @@ class TomTomService:
         self.session = requests.Session()
         self.session.headers.update({
             'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'User-Agent': 'MoveSmart-Traffic-System/1.0'
         })
+        # Add retry configuration
+        self.max_retries = 3
+        self.retry_delay = 1.0
+        
+        # Test API key on initialization
+        self._test_api_key()
+    
+    def _test_api_key(self) -> bool:
+        """
+        Test if the TomTom API key is valid by making a simple request.
+        
+        Returns:
+            True if API key is valid, False otherwise
+        """
+        try:
+            # Make a simple request to test the API key
+            test_url = f"{self.base_url}/traffic/services/4/flowSegmentData/absolute/10/json"
+            test_params = {
+                'key': self.api_key,
+                'point': '-1.2921,36.8219',  # Nairobi coordinates
+                'unit': 'KMPH'
+            }
+            
+            response = self.session.get(test_url, params=test_params, timeout=5)
+            
+            if response.status_code == 200:
+                logger.info("TomTom API key is valid and working")
+                return True
+            elif response.status_code == 403:
+                logger.error("TomTom API key is invalid or has insufficient permissions")
+                return False
+            else:
+                logger.warning(f"TomTom API test returned status {response.status_code}")
+                return False
+                
+        except requests.RequestException as e:
+            logger.warning(f"Could not test TomTom API key: {e}")
+            return False
     
     def get_traffic_flow(self, lat: float, lon: float, zoom: int = 12) -> Dict[str, Any]:
         """

@@ -367,14 +367,51 @@ const Dashboard: React.FC = () => {
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, active: false },
   ];
 
-  // User data for the navbar
-  const mockUser = {
-    name: 'Charles Chyna',
-    role: 'Traffic Analyst',
-    avatar: '/api/placeholder/40/40',
-    initials: 'CC',
-    email: 'charles.chyna@movesmart.ke'
-  };
+  // Get dynamic user data from localStorage or context
+  const [currentUser, setCurrentUser] = useState(() => {
+    // Try to get user from demo storage (from signup)
+    const demoUser = localStorage.getItem('demo_user');
+    if (demoUser) {
+      const userData = JSON.parse(demoUser);
+      const firstInitial = userData.first_name ? userData.first_name.charAt(0).toUpperCase() : userData.username.charAt(0).toUpperCase();
+      const lastInitial = userData.last_name ? userData.last_name.charAt(0).toUpperCase() : (userData.username.length > 1 ? userData.username.charAt(1).toUpperCase() : userData.email.charAt(0).toUpperCase());
+      return {
+        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+        role: 'Traffic Analyst',
+        avatar: '/api/placeholder/40/40',
+        initials: `${firstInitial}${lastInitial}`,
+        email: userData.email
+      };
+    }
+    
+    // Try to get user from regular auth storage
+    const authUser = localStorage.getItem('user');
+    if (authUser) {
+      try {
+        const userData = JSON.parse(authUser);
+        const firstInitial = userData.first_name ? userData.first_name.charAt(0).toUpperCase() : userData.username.charAt(0).toUpperCase();
+        const lastInitial = userData.last_name ? userData.last_name.charAt(0).toUpperCase() : (userData.username.length > 1 ? userData.username.charAt(1).toUpperCase() : userData.email.charAt(0).toUpperCase());
+        return {
+          name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+          role: 'Traffic Analyst',
+          avatar: '/api/placeholder/40/40',
+          initials: `${firstInitial}${lastInitial}`,
+          email: userData.email
+        };
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    // Fallback to demo user
+    return {
+      name: 'Demo User',
+      role: 'Traffic Analyst',
+      avatar: '/api/placeholder/40/40',
+      initials: 'DU',
+      email: 'demo@movesmart.ke'
+    };
+  });
 
   const handleSearch = (query: string) => {
     console.log('Search query:', query);
@@ -624,10 +661,10 @@ const Dashboard: React.FC = () => {
             {/* User Profile - Simplified */}
             <div className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-1.5">
               <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">CC</span>
+                <span className="text-white font-bold text-xs">{currentUser.initials}</span>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm font-medium text-gray-900">Charles Chyna</p>
+                <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
               </div>
             </div>
           </motion.div>

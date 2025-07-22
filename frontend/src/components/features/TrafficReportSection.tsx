@@ -15,11 +15,14 @@ import {
   ChevronUpIcon,
   BookmarkIcon,
   ShareIcon,
-  PrinterIcon
+  PrinterIcon,
+  ChartBarIcon,
+  LightBulbIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import apiService from '../../services/api';
 import { DEFAULT_COORDINATES } from '../../constants';
+import TrafficReportDisplay from './TrafficReportDisplay';
 
 interface TrafficReport {
   id: number;
@@ -88,21 +91,17 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
         const { latitude, longitude } = position.coords;
         
         try {
-          // Try TomTom reverse geocoding directly
-          const tomTomApiKey = import.meta.env.VITE_TOMTOM_API_KEY;
-          if (!tomTomApiKey) {
-            throw new Error('TomTom API key not found');
-          }
-
-          const response = await fetch(
-            `https://api.tomtom.com/search/2/reverseGeocode/${latitude},${longitude}.json?key=${tomTomApiKey}&language=en`,
-            {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-              },
-            }
-          );
+          // Use our backend reverse geocoding endpoint
+          const response = await fetch('http://localhost:8000/api/traffic/reports/reverse-geocode/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              latitude: latitude,
+              longitude: longitude
+            })
+          });
 
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -110,11 +109,8 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
 
           const data = await response.json();
           
-          if (data.results && data.results.length > 0) {
-            const result = data.results[0];
-            const address = result.address.freeformAddress || 
-                           `${result.address.streetName || ''} ${result.address.municipality || ''} ${result.address.country || ''}`.trim() ||
-                           `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          if (data.success && data.address) {
+            const address = data.address;
             
             setLocation(address);
             setUseCurrentLocation(true);
@@ -123,9 +119,9 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
             return;
           }
           
-          throw new Error('No results found');
+          throw new Error('No results from backend');
         } catch (error) {
-          console.warn('TomTom reverse geocoding failed:', error);
+          console.warn('Backend reverse geocoding failed:', error);
           
           // Try alternative: Use a simple location name based on coordinates
           const locationName = getLocationNameFromCoords(latitude, longitude);
@@ -137,11 +133,12 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
             return;
           }
           
-          // Final fallback to coordinates
+          // Final fallback to coordinates - but we'll store coordinates for the backend
+          // and show a user-friendly message
           setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
           setUseCurrentLocation(true);
           setGettingLocation(false);
-          toast.success('Location detected (coordinates)');
+          toast.success('Location detected - will be resolved during report generation');
         }
       },
       (error) => {
@@ -196,6 +193,13 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
   };
 
   // Generate traffic report
+const [showReportPopup, setShowReportPopup] = useState(false);
+
+  const handleDownload = (report: TrafficReport) => {
+    // Assume report.downloadUrl is correctly set
+    window.open(report.downloadUrl, '_blank');
+  };
+
   const generateReport = async () => {
     if (!location.trim() && !useCurrentLocation) {
       toast.error('Please enter a location or use current location');
@@ -226,13 +230,12 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
 
       if (response.success) {
         const report = response.data;
-        setCurrentReport(report);
-        
+setCurrentReport(report);
+        setShowReportPopup(true); // Show the popup
+
         // Add to history
         const newHistory = [report, ...reportHistory.slice(0, 9)]; // Keep last 10 reports
         saveReportHistory(newHistory);
-        
-        toast.success('Traffic report generated successfully!');
       } else {
         toast.error('Failed to generate report');
       }
@@ -388,119 +391,6 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
         </div>
       </div>
 
-      {/* Current Report Display */}
-      {currentReport && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-sm p-6"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              {currentReport.title}
-            </h3>
-            <div className="flex space-x-2">
-              <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <BookmarkIcon className="w-4 h-4" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <ShareIcon className="w-4 h-4" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <PrinterIcon className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Report Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-1">
-                <SignalIcon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-600">Congestion</span>
-              </div>
-              <div className={`text-2xl font-bold ${getCongestionInfo(currentReport.congestion_level).color}`}>
-                {currentReport.congestion_level}%
-              </div>
-              <div className="text-sm text-gray-500">
-                {getCongestionInfo(currentReport.congestion_level).text}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-1">
-                <ClockIcon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-600">Avg Speed</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-600">
-                {currentReport.avg_speed.toFixed(1)} km/h
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-1">
-                <ExclamationTriangleIcon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-600">Incidents</span>
-              </div>
-              <div className="text-2xl font-bold text-orange-600">
-                {currentReport.incident_count}
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-1">
-                <InformationCircleIcon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-600">Generated</span>
-              </div>
-              <div className="text-sm font-medium text-gray-900">
-                {new Date(currentReport.created_at).toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          {/* Detailed Metrics for Detailed Reports */}
-          {currentReport.detailed_metrics && (
-            <div className="bg-blue-50 rounded-lg p-4 mb-6">
-              <h4 className="font-medium text-blue-900 mb-2">Detailed Analysis Metrics</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-700">Congested Areas:</span>
-                  <span className="ml-2 font-medium">{currentReport.detailed_metrics.congested_areas_count}</span>
-                </div>
-                <div>
-                  <span className="text-blue-700">Routes Analyzed:</span>
-                  <span className="ml-2 font-medium">{currentReport.detailed_metrics.major_routes_analyzed}</span>
-                </div>
-                <div>
-                  <span className="text-blue-700">Analysis Radius:</span>
-                  <span className="ml-2 font-medium">{currentReport.detailed_metrics.analysis_radius_km} km</span>
-                </div>
-                <div>
-                  <span className="text-blue-700">Sampling Points:</span>
-                  <span className="ml-2 font-medium">{currentReport.detailed_metrics.sampling_points}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* AI Analysis */}
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Traffic Analysis</h4>
-              <div className="bg-gray-50 rounded-lg p-4 text-sm">
-                {formatAIAnalysis(currentReport.ai_analysis)}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Recommendations</h4>
-              <div className="bg-green-50 rounded-lg p-4 text-sm">
-                {formatAIAnalysis(currentReport.ai_recommendations)}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Report History */}
       {reportHistory.length > 0 && (
@@ -561,6 +451,41 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+{/* Report Popup */}
+      {showReportPopup && currentReport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">Report Ready</h3>
+            <p className="text-gray-600">Your report for {currentReport.location} is ready.</p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => { setShowReportPopup(false); setCurrentReport(null); }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => { setShowReportPopup(false); setCurrentReport(null); handleDownload(currentReport); }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Download
+              </button>
+              <button
+                onClick={() => { setShowReportPopup(false); window.location.href = '/reports-page'; }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                View
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

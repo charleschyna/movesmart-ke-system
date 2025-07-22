@@ -50,31 +50,82 @@ const UserProfile: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'activity' | 'security'>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [profileData, setProfileData] = useState<User>({
-    id: '1',
-    email: 'charles.chyna@movesmart.ke',
-    name: 'Charles Chyna',
-    defaultCity: 'Nairobi',
-    savedRoutes: [],
-    notificationPreferences: {
-      emailNotifications: true,
-      pushNotifications: true,
-      trafficAlerts: true,
-      incidentAlerts: true,
-      routeUpdates: false
-    },
-    createdAt: '2023-06-15T08:00:00Z'
+  
+  // Get dynamic user data from localStorage
+  const [profileData, setProfileData] = useState<User>(() => {
+    // Try to get user from demo storage (from signup)
+    const demoUser = localStorage.getItem('demo_user');
+    if (demoUser) {
+      const userData = JSON.parse(demoUser);
+      return {
+        id: userData.id?.toString() || '1',
+        email: userData.email,
+        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+        defaultCity: 'Nairobi',
+        savedRoutes: [],
+        notificationPreferences: {
+          emailNotifications: true,
+          pushNotifications: true,
+          trafficAlerts: true,
+          incidentAlerts: true,
+          routeUpdates: false
+        },
+        createdAt: new Date().toISOString()
+      };
+    }
+    
+    // Try to get user from regular auth storage
+    const authUser = localStorage.getItem('user');
+    if (authUser) {
+      try {
+        const userData = JSON.parse(authUser);
+        return {
+          id: userData.id?.toString() || '1',
+          email: userData.email,
+          name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+          defaultCity: 'Nairobi',
+          savedRoutes: [],
+          notificationPreferences: {
+            emailNotifications: true,
+            pushNotifications: true,
+            trafficAlerts: true,
+            incidentAlerts: true,
+            routeUpdates: false
+          },
+          createdAt: userData.createdAt || new Date().toISOString()
+        };
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+    
+    // Fallback to demo user
+    return {
+      id: '1',
+      email: 'demo@movesmart.ke',
+      name: 'Demo User',
+      defaultCity: 'Nairobi',
+      savedRoutes: [],
+      notificationPreferences: {
+        emailNotifications: true,
+        pushNotifications: true,
+        trafficAlerts: true,
+        incidentAlerts: true,
+        routeUpdates: false
+      },
+      createdAt: new Date().toISOString()
+    };
   });
 
-  const [editData, setEditData] = useState({
+  const [editData, setEditData] = useState(() => ({
     name: profileData.name,
     email: profileData.email,
     phone: '+254 712 345 678',
     location: 'Nairobi, Kenya',
     bio: 'Traffic analyst passionate about smart city solutions and sustainable transportation.',
     company: 'MoveSmart Kenya',
-    role: 'Senior Traffic Analyst'
-  });
+    role: 'Traffic Analyst'
+  }));
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',

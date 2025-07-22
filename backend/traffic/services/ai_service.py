@@ -13,12 +13,22 @@ class AITrafficAnalyzer:
     
     def __init__(self):
         self.openai_api_key = getattr(settings, 'OPENAI_API_KEY', None)
-        self.use_mock_ai = not bool(self.openai_api_key)
+        self.openrouter_api_key = getattr(settings, 'OPENROUTER_API_KEY', None)
+        self.ai_model = getattr(settings, 'AI_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free')
         
-        if self.use_mock_ai:
-            logger.info("Using mock AI service (OpenAI API key not configured)")
-        else:
+        # Prioritize OpenRouter, then OpenAI, then mock
+        if self.openrouter_api_key:
+            self.use_mock_ai = False
+            self.api_type = 'openrouter'
+            logger.info(f"Using OpenRouter API with model {self.ai_model} for traffic analysis")
+        elif self.openai_api_key:
+            self.use_mock_ai = False
+            self.api_type = 'openai'
             logger.info("Using OpenAI API for traffic analysis")
+        else:
+            self.use_mock_ai = True
+            self.api_type = 'mock'
+            logger.info("Using mock AI service (no API key configured)")
     
     def analyze_traffic_data(self, traffic_data: Dict[str, Any], 
                            incidents_data: List[Dict[str, Any]], 
@@ -165,48 +175,75 @@ class AITrafficAnalyzer:
     def _generate_openai_analysis(self, traffic_data: Dict[str, Any], 
                                 incidents_data: List[Dict[str, Any]], 
                                 location: str) -> Dict[str, str]:
-        """Generate AI analysis using OpenAI API."""
+        """Generate AI analysis using OpenAI or OpenRouter API."""
         
-        # Prepare data for OpenAI
+        # Prepare data for AI
         prompt = self._create_analysis_prompt(traffic_data, incidents_data, location)
         
         try:
-            response = requests.post(
-                'https://api.openai.com/v1/chat/completions',
-                headers={
-                    'Authorization': f'Bearer {self.openai_api_key}',
-                    'Content-Type': 'application/json',
-                },
-                json={
-                    'model': 'gpt-3.5-turbo',
-                    'messages': [
-                        {
-                            'role': 'system',
-                            'content': 'You are a traffic analysis expert. Analyze the provided traffic data and generate practical insights and recommendations for drivers.'
-                        },
-                        {
-                            'role': 'user',
-                            'content': prompt
-                        }
-                    ],
-                    'max_tokens': 500,
-                    'temperature': 0.7
-                },
-                timeout=30
-            )
+            if self.api_type == 'openrouter':
+                response = requests.post(
+                    'https://openrouter.ai/api/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {self.openrouter_api_key}',
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://movesmart.ke',
+                        'X-Title': 'MoveSmart Traffic Analysis'
+                    },
+                    json={
+                        'model': self.ai_model,
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': 'You are a traffic analysis expert for Kenya. Analyze the provided traffic data and generate practical insights and recommendations for drivers in Kenyan cities. Focus on local context and practical advice.'
+                            },
+                            {
+                                'role': 'user',
+                                'content': prompt
+                            }
+                        ],
+                        'max_tokens': 800,
+                        'temperature': 0.7
+                    },
+                    timeout=30
+                )
+            else:
+                response = requests.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {self.openai_api_key}',
+                        'Content-Type': 'application/json',
+                    },
+                    json={
+                        'model': 'gpt-3.5-turbo',
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': 'You are a traffic analysis expert. Analyze the provided traffic data and generate practical insights and recommendations for drivers.'
+                            },
+                            {
+                                'role': 'user',
+                                'content': prompt
+                            }
+                        ],
+                        'max_tokens': 500,
+                        'temperature': 0.7
+                    },
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 result = response.json()
                 ai_response = result['choices'][0]['message']['content']
                 
                 # Parse the response to extract analysis and recommendations
-                return self._parse_openai_response(ai_response)
+                return self._parse_ai_response(ai_response)
             else:
-                logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+                logger.error(f"{self.api_type.upper()} API error: {response.status_code} - {response.text}")
                 return self._generate_mock_analysis(traffic_data, incidents_data, location)
                 
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error calling {self.api_type.upper()} API: {e}")
             return self._generate_mock_analysis(traffic_data, incidents_data, location)
     
     def _create_analysis_prompt(self, traffic_data: Dict[str, Any], 
@@ -232,8 +269,8 @@ RECOMMENDATIONS: [your recommendations here]
 """
         return prompt
     
-    def _parse_openai_response(self, response: str) -> Dict[str, str]:
-        """Parse OpenAI response to extract analysis and recommendations."""
+    def _parse_ai_response(self, response: str) -> Dict[str, str]:
+        """Parse AI response to extract analysis and recommendations."""
         
         analysis = ""
         recommendations = ""
@@ -256,13 +293,26 @@ RECOMMENDATIONS: [your recommendations here]
                 elif current_section == 'recommendations' and line:
                     recommendations += f"\\n{line}"
             
+            # If structured parsing fails, try to split by common patterns
+            if not analysis or not recommendations:
+                # Try alternative parsing patterns
+                if "ANALYSIS" in response.upper() and "RECOMMENDATIONS" in response.upper():
+                    parts = response.upper().split("RECOMMENDATIONS")
+                    analysis = parts[0].replace("ANALYSIS:", "").replace("ANALYSIS", "").strip()
+                    recommendations = parts[1].strip() if len(parts) > 1 else ""
+                else:
+                    # Fallback: split response in half
+                    mid_point = len(response) // 2
+                    analysis = response[:mid_point].strip()
+                    recommendations = response[mid_point:].strip()
+            
             return {
-                'analysis': analysis.strip(),
-                'recommendations': recommendations.strip()
+                'analysis': analysis.strip() if analysis else "Traffic conditions analyzed.",
+                'recommendations': recommendations.strip() if recommendations else "Monitor traffic conditions and plan accordingly."
             }
             
         except Exception as e:
-            logger.error(f"Error parsing OpenAI response: {e}")
+            logger.error(f"Error parsing AI response: {e}")
             return {
                 'analysis': response[:300] + "..." if len(response) > 300 else response,
                 'recommendations': "Monitor traffic conditions and plan accordingly."
@@ -457,6 +507,199 @@ RECOMMENDATIONS: [your recommendations here]
             'congested_areas_count': len(congested_areas),
             'major_routes_analyzed': len(route_analysis)
         }
+    
+    def _generate_detailed_openai_analysis(self, detailed_traffic_data: Dict[str, Any], location: str) -> Dict[str, str]:
+        """
+        Generate comprehensive AI analysis for detailed traffic reports using OpenAI/OpenRouter API.
+        
+        Args:
+            detailed_traffic_data: Detailed traffic data from TomTom API
+            location: Location name for context
+            
+        Returns:
+            Dictionary with comprehensive AI analysis and recommendations
+        """
+        
+        # Prepare comprehensive prompt for AI
+        prompt = self._create_detailed_analysis_prompt(detailed_traffic_data, location)
+        
+        try:
+            if self.api_type == 'openrouter':
+                response = requests.post(
+                    'https://openrouter.ai/api/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {self.openrouter_api_key}',
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://movesmart.ke',
+                        'X-Title': 'MoveSmart Detailed Traffic Analysis'
+                    },
+                    json={
+                        'model': self.ai_model,
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': '''You are an expert traffic analyst for Kenya with deep knowledge of local traffic patterns, infrastructure, and driving conditions. Provide comprehensive, actionable insights for drivers and traffic management. Focus on:
+                                - Current traffic conditions and congestion hotspots
+                                - Impact of incidents on traffic flow
+                                - Best route recommendations
+                                - Time-sensitive advice
+                                - Local context (rush hours, events, weather)
+                                - Safety considerations
+                                Use emojis and clear formatting to make the analysis engaging and easy to read.'''
+                            },
+                            {
+                                'role': 'user',
+                                'content': prompt
+                            }
+                        ],
+                        'max_tokens': 1200,
+                        'temperature': 0.7
+                    },
+                    timeout=45
+                )
+            else:
+                response = requests.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {self.openai_api_key}',
+                        'Content-Type': 'application/json',
+                    },
+                    json={
+                        'model': 'gpt-3.5-turbo',
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': 'You are an expert traffic analyst. Provide comprehensive analysis of traffic conditions with practical recommendations for drivers.'
+                            },
+                            {
+                                'role': 'user',
+                                'content': prompt
+                            }
+                        ],
+                        'max_tokens': 800,
+                        'temperature': 0.7
+                    },
+                    timeout=30
+                )
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result['choices'][0]['message']['content']
+                
+                # Parse the response and extract metrics
+                parsed_response = self._parse_detailed_ai_response(ai_response, detailed_traffic_data)
+                return parsed_response
+            else:
+                logger.error(f"{self.api_type.upper()} API error: {response.status_code} - {response.text}")
+                return self._generate_detailed_mock_analysis(detailed_traffic_data, location)
+                
+        except Exception as e:
+            logger.error(f"Error calling {self.api_type.upper()} API for detailed analysis: {e}")
+            return self._generate_detailed_mock_analysis(detailed_traffic_data, location)
+    
+    def _create_detailed_analysis_prompt(self, detailed_traffic_data: Dict[str, Any], location: str) -> str:
+        """
+        Create a comprehensive prompt for detailed traffic analysis.
+        
+        Args:
+            detailed_traffic_data: Detailed traffic data from TomTom API
+            location: Location name for context
+            
+        Returns:
+            Formatted prompt string for AI analysis
+        """
+        
+        flow_points = detailed_traffic_data.get('traffic_flow_points', [])
+        incidents = detailed_traffic_data.get('incidents', {}).get('incidents', [])
+        major_routes = detailed_traffic_data.get('major_routes', [])
+        center_coords = detailed_traffic_data.get('center_coordinates', [])
+        radius = detailed_traffic_data.get('radius_km', 10)
+        
+        prompt = f"""Analyze the comprehensive traffic data for {location} and provide detailed insights:
+
+📍 ANALYSIS AREA: {location}
+📐 COVERAGE: {radius}km radius around {center_coords}
+⏰ TIMESTAMP: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+🚦 TRAFFIC FLOW DATA:
+{len(flow_points)} monitoring points analyzed
+{json.dumps(flow_points[:3], indent=2) if flow_points else 'No flow data available'}
+
+🚨 INCIDENTS DATA:
+{len(incidents)} incidents detected
+{json.dumps(incidents[:5], indent=2) if incidents else 'No incidents reported'}
+
+🛣️ MAJOR ROUTES:
+{len(major_routes)} major routes analyzed
+{json.dumps(major_routes, indent=2) if major_routes else 'No major routes data available'}
+
+Please provide a comprehensive analysis with:
+
+1. **TRAFFIC OVERVIEW**: Current overall traffic conditions
+2. **CONGESTION HOTSPOTS**: Specific areas with heavy congestion
+3. **INCIDENT IMPACT**: How incidents are affecting traffic flow
+4. **ROUTE RECOMMENDATIONS**: Best and worst routes currently
+5. **TIME-SENSITIVE ADVICE**: Immediate actions for drivers
+6. **SAFETY ALERTS**: Any safety concerns or hazards
+
+Format your response as:
+ANALYSIS: [comprehensive traffic analysis with emojis and clear sections]
+RECOMMENDATIONS: [practical, actionable recommendations for drivers]
+"""
+        
+        return prompt
+    
+    def _parse_detailed_ai_response(self, response: str, detailed_traffic_data: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Parse detailed AI response and extract metrics.
+        
+        Args:
+            response: AI response text
+            detailed_traffic_data: Original traffic data for metric extraction
+            
+        Returns:
+            Dictionary with parsed analysis and extracted metrics
+        """
+        
+        # Parse analysis and recommendations
+        parsed = self._parse_ai_response(response)
+        
+        # Extract metrics from traffic data
+        flow_points = detailed_traffic_data.get('traffic_flow_points', [])
+        incidents = detailed_traffic_data.get('incidents', {}).get('incidents', [])
+        major_routes = detailed_traffic_data.get('major_routes', [])
+        
+        # Calculate metrics
+        total_speeds = []
+        congested_areas = 0
+        
+        for point in flow_points:
+            if 'flowSegmentData' in point:
+                segment = point['flowSegmentData']
+                current_speed = segment.get('currentSpeed', 0)
+                free_flow_speed = segment.get('freeFlowSpeed', 0)
+                
+                if current_speed > 0:
+                    total_speeds.append(current_speed)
+                    
+                    if free_flow_speed > 0:
+                        congestion_percent = (1 - (current_speed / free_flow_speed)) * 100
+                        if congestion_percent > 40:
+                            congested_areas += 1
+        
+        avg_speed = round(sum(total_speeds) / len(total_speeds)) if total_speeds else 0
+        overall_congestion = min(max(congested_areas * 20, 0), 100)  # Rough estimate
+        
+        # Add calculated metrics to the response
+        parsed.update({
+            'congestion_level': overall_congestion,
+            'avg_speed': avg_speed,
+            'incident_count': len(incidents),
+            'congested_areas_count': congested_areas,
+            'major_routes_analyzed': len(major_routes)
+        })
+        
+        return parsed
 
 
 # Singleton instance

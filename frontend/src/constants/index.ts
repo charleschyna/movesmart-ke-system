@@ -7,11 +7,12 @@ export const API_BASE_URL = process.env.NODE_ENV === 'production'
 export const API_ENDPOINTS = {
   // Authentication endpoints
   AUTH: {
-    LOGIN: '/api/auth/login',
-    REGISTER: '/api/auth/register',
-    LOGOUT: '/api/auth/logout',
-    REFRESH: '/api/auth/refresh',
-    PROFILE: '/api/auth/profile',
+    LOGIN: '/auth/login/',
+    REGISTER: '/auth/register/',
+    LOGOUT: '/auth/logout/',
+    REFRESH: '/auth/refresh/',
+    PROFILE: '/auth/profile/',
+    GOOGLE_LOGIN: '/auth/google-login/',
   },
   
   // Traffic endpoints
@@ -26,9 +27,9 @@ export const API_ENDPOINTS = {
   },
   
   // Traffic Reports endpoints
-  TRAFFIC_REPORTS: '/api/traffic/reports',
-  TRAFFIC_REPORT_GENERATE: '/api/traffic/reports/generate-report',
-  TRAFFIC_REPORT_DETAILED: '/api/traffic/reports/generate-detailed-report',
+  TRAFFIC_REPORTS: '/api/traffic/reports/',
+  TRAFFIC_REPORT_GENERATE: '/api/traffic/reports/generate-report/',
+  TRAFFIC_REPORT_DETAILED: '/api/traffic/reports/generate-detailed-report/',
   
   // Routes endpoints
   ROUTES: {

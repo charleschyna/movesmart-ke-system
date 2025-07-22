@@ -50,19 +50,28 @@ class TrafficReportViewSet(viewsets.ViewSet):
                 return Response({'error': 'Coordinates could not be determined for location'}, status=status.HTTP_400_BAD_REQUEST)
             latitude, longitude = coords
 
+        # Get the proper location name using reverse geocoding
+        location_info = geocoding_service.reverse_geocode(latitude, longitude)
+        if location_info and location_info.get('formatted_address'):
+            location_name = location_info['formatted_address']
+            logger.info(f"Using reverse geocoded location: {location_name}")
+        else:
+            location_name = location
+            logger.info(f"Using original location: {location_name}")
+
         # Fetch traffic data
         tomtom_service = TomTomService()
         traffic_data = tomtom_service.get_traffic_flow(lat=latitude, lon=longitude)
         incidents_data = tomtom_service.get_traffic_incidents(bbox=f"{longitude},{latitude},{longitude},{latitude}")
 
         # AI analysis
-        ai_result = ai_analyzer.analyze_traffic_data(traffic_data, incidents_data, location)
+        ai_result = ai_analyzer.analyze_traffic_data(traffic_data, incidents_data, location_name)
 
         # Create and save report
         traffic_report = TrafficReport.objects.create(
-            title=f"Traffic Report for {location}",
+            title=f"Traffic Report for {location_name}",
             report_type=serializer.validated_data['report_type'],
-            location=location,
+            location=location_name,
             latitude=latitude,
             longitude=longitude,
             traffic_data=traffic_data,
@@ -78,6 +87,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='generate-detailed-report')
     def generate_detailed_report(self, request):
+        logger.info(f"Received request data: {request.data}")
         """Generate a comprehensive traffic report with detailed analysis."""
         from traffic.services.geocoding_service import geocoding_service
         from traffic.services.ai_service import ai_analyzer
@@ -95,7 +105,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
         longitude = serializer.validated_data.get('longitude')
         radius_km = request.data.get('radius_km', 10)  # Default 10km radius
 
-        if use_current_location:
+        if use_current_location and not latitude and not longitude:
+            # Only use current location if no coordinates provided and user explicitly requested it
             latitude, longitude = self.get_current_location_coordinates()
 
         if not latitude or not longitude:
@@ -104,18 +115,27 @@ class TrafficReportViewSet(viewsets.ViewSet):
                 return Response({'error': 'Coordinates could not be determined for location'}, status=status.HTTP_400_BAD_REQUEST)
             latitude, longitude = coords
 
+        # Get the proper location name using reverse geocoding
+        location_info = geocoding_service.reverse_geocode(latitude, longitude)
+        if location_info and location_info.get('formatted_address'):
+            location_name = location_info['formatted_address']
+            logger.info(f"Using reverse geocoded location: {location_name}")
+        else:
+            location_name = location
+            logger.info(f"Using original location: {location_name}")
+
         # Fetch detailed traffic data
         tomtom_service = TomTomService()
         detailed_traffic_data = tomtom_service.get_detailed_traffic_report((latitude, longitude), radius_km)
 
         # Comprehensive AI analysis
-        ai_result = ai_analyzer.analyze_detailed_traffic_data(detailed_traffic_data, location)
+        ai_result = ai_analyzer.analyze_detailed_traffic_data(detailed_traffic_data, location_name)
 
         # Create and save detailed report
         traffic_report = TrafficReport.objects.create(
-            title=f"Detailed Traffic Report for {location}",
+            title=f"Detailed Traffic Report for {location_name}",
             report_type=serializer.validated_data['report_type'],
-            location=location,
+            location=location_name,
             latitude=latitude,
             longitude=longitude,
             traffic_data=detailed_traffic_data,
@@ -140,8 +160,113 @@ class TrafficReportViewSet(viewsets.ViewSet):
 
     def get_current_location_coordinates(self) -> tuple:
         """Placeholder method to obtain current device coordinates."""
-        # This is a placeholder. Integration with a real geolocation service would be needed.
-        return -1.2921, 36.8219  # Default to Nairobi
+        # This should not be used as fallback. Return None to force proper geocoding.
+        return None, None
+    
+    @action(detail=False, methods=['post'], url_path='reverse-geocode')
+    def reverse_geocode(self, request):
+        """Reverse geocode coordinates to get address using enhanced TomTom API."""
+        from traffic.services.geocoding_service import geocoding_service
+        
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+        
+        if not latitude or not longitude:
+            return Response({
+                'error': 'Both latitude and longitude are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Convert to float in case they're strings
+            latitude = float(latitude)
+            longitude = float(longitude)
+            
+            # Use the enhanced geocoding service
+            result = geocoding_service.reverse_geocode(latitude, longitude)
+            
+            if result:
+                return Response({
+                    'success': True,
+                    'address': result['formatted_address'],
+                    'details': {
+                        'street': result.get('street', ''),
+                        'city': result.get('city', ''),
+                        'country': result.get('country', ''),
+                        'postal_code': result.get('postal_code', ''),
+                        'confidence': result.get('confidence', 0)
+                    },
+                    'coordinates': {
+                        'latitude': latitude,
+                        'longitude': longitude
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                # Fallback to coordinates if reverse geocoding fails
+                return Response({
+                    'success': True,
+                    'address': f"{latitude:.4f}, {longitude:.4f}",
+                    'details': {
+                        'street': '',
+                        'city': 'Unknown',
+                        'country': 'Kenya',
+                        'postal_code': '',
+                        'confidence': 0
+                    },
+                    'coordinates': {
+                        'latitude': latitude,
+                        'longitude': longitude
+                    }
+                }, status=status.HTTP_200_OK)
+                
+        except ValueError:
+            return Response({
+                'error': 'Invalid latitude or longitude format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error in reverse geocoding: {e}")
+            return Response({
+                'error': 'Failed to reverse geocode location'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'], url_path='geocode')
+    def geocode(self, request):
+        """Geocode an address to get coordinates using enhanced TomTom API."""
+        from traffic.services.geocoding_service import geocoding_service
+        
+        address = request.data.get('address')
+        
+        if not address:
+            return Response({
+                'error': 'Address is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Use the enhanced geocoding service
+            result = geocoding_service.geocode_address(address)
+            
+            if result:
+                return Response({
+                    'success': True,
+                    'coordinates': {
+                        'latitude': result['latitude'],
+                        'longitude': result['longitude']
+                    },
+                    'address': result['formatted_address'],
+                    'details': {
+                        'country': result.get('country', ''),
+                        'confidence': result.get('confidence', 0)
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'Could not geocode the provided address'
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            logger.error(f"Error in geocoding: {e}")
+            return Response({
+                'error': 'Failed to geocode address'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     @action(detail=False, methods=['get'])
     def live_traffic(self, request):
         """Get live traffic data from TomTom API."""

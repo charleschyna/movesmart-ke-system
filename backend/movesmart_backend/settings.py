@@ -25,12 +25,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-4g_rtpzv^#5*$gq&sbr&2jd=v@21d^9gp7=auww4!&0rx@cotr'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-movesmart-kenya-traffic-system-2025-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 
 
 # Application definition
@@ -43,9 +43,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',  # Add token authentication
     'corsheaders',
     'traffic',
     'incidents',
+    'authentication',  # Custom authentication app
 ]
 
 MIDDLEWARE = [
@@ -82,11 +84,15 @@ WSGI_APPLICATION = 'movesmart_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# PostgreSQL Database Configuration
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
@@ -133,8 +139,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework configuration
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.AllowAny',  # Allow all for now, can be changed per view
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -157,6 +167,17 @@ CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 TOMTOM_API_KEY = os.environ.get('TOMTOM_API_KEY')
 if not TOMTOM_API_KEY:
     raise ValueError("TOMTOM_API_KEY environment variable is required")
+
+# OpenAI API Configuration (optional)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+
+# OpenRouter API Configuration (optional)
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+AI_MODEL = os.environ.get('AI_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free')
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '759211220044-od9no67r0ks0ai8sjb697o8igc3irn8o.apps.googleusercontent.com')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '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')
 
 LOGGING = {
     'version': 1,
