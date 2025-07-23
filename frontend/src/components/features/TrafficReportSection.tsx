@@ -479,10 +479,21 @@ setCurrentReport(report);
                 Download
               </button>
               <button
-                onClick={() => { setShowReportPopup(false); window.location.href = '/reports-page'; }}
+                onClick={() => { 
+                  setShowReportPopup(false); 
+                  // Save the generated report to the shared storage that AI Reports page reads from
+                  const currentReports = JSON.parse(localStorage.getItem('movesmart_report_history') || '[]');
+                  const updatedReports = [currentReport, ...currentReports].slice(0, 50); // Keep last 50 reports
+                  localStorage.setItem('movesmart_report_history', JSON.stringify(updatedReports));
+                  
+                  // Navigate to AI Reports page by changing the active navigation item
+                  // This assumes we have access to the parent dashboard's navigation state
+                  // For now, we'll use a simple approach by triggering a custom event
+                  window.dispatchEvent(new CustomEvent('navigate-to-ai-reports'));
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                View
+                View in AI Reports
               </button>
             </div>
           </motion.div>

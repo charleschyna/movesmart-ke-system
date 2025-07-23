@@ -36,6 +36,8 @@ import NotificationCenter from '../features/NotificationCenter';
 import Settings from '../features/Settings';
 import StatsCards from './StatsCards';
 import TrafficReportSection from '../features/TrafficReportSection';
+import AITrafficReports from '../features/AITrafficReports';
+import IncidentsPage from '../incidents/IncidentsPage';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -116,6 +118,16 @@ const Dashboard: React.FC = () => {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Listen for navigation events from child components
+  useEffect(() => {
+    const handleNavigateToAiReports = () => {
+      setActiveNavItem('aiReports');
+    };
+
+    window.addEventListener('navigate-to-ai-reports', handleNavigateToAiReports);
+    return () => window.removeEventListener('navigate-to-ai-reports', handleNavigateToAiReports);
   }, []);
 
   // Initialize map only once
@@ -360,8 +372,10 @@ const Dashboard: React.FC = () => {
     { id: 'analytics', label: 'Predictive Analytics', icon: ChartBarIcon, active: false },
     { id: 'simulation', label: 'Scenario Simulation', icon: BeakerIcon, active: false },
     { id: 'reports', label: 'Reports & Exports', icon: DocumentTextIcon, active: false },
+    { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon, active: false },
     { id: 'sustainability', label: 'Sustainability Panel', icon: GlobeAltIcon, active: false },
     { id: 'profile', label: 'User Profile', icon: UserIcon, active: false },
+    { id: 'liveIncidents', label: 'Live Incidents', icon: ExclamationTriangleIcon, active: false },
     { id: 'incidents', label: 'Incident Reporting', icon: ExclamationCircleIcon, active: false },
     { id: 'notifications', label: 'Notification Center', icon: BellIcon, active: false },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, active: false },
@@ -435,6 +449,10 @@ const Dashboard: React.FC = () => {
     toast.success(`Switched to ${city.name}`);
   };
 
+  const handleLiveIncidentsClick = () => {
+    setActiveNavItem('liveIncidents');
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       <div className="flex-1 flex">
@@ -442,7 +460,7 @@ const Dashboard: React.FC = () => {
         <motion.div 
           initial={{ x: -250 }}
           animate={{ x: 0 }}
-          className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-white shadow-xl border-r border-gray-100 flex flex-col transition-all duration-300 relative`}
+          className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-white shadow-xl border-r border-gray-100 flex flex-col transition-all duration-300 relative sticky top-0 h-screen`}
         >
         {/* Modern Logo Section */}
         <div className="p-6 border-b border-gray-100">
@@ -561,7 +579,7 @@ const Dashboard: React.FC = () => {
         <motion.header 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="h-16 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 relative"
+          className="h-16 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 relative sticky top-0 z-40"
         >
           {/* Left Section - Title and City Selector */}
           <div className="flex items-center space-x-4">
@@ -676,7 +694,7 @@ const Dashboard: React.FC = () => {
             <div className="p-6">
               {/* Stats Cards */}
               <div className="mb-6">
-                <StatsCards data={trafficData} loading={loading} />
+                <StatsCards data={trafficData} loading={loading} onLiveIncidentsClick={handleLiveIncidentsClick} />
               </div>
 
               {/* Main Content Grid */}
@@ -767,12 +785,20 @@ const Dashboard: React.FC = () => {
             <ReportsExports />
           )}
 
+          {activeNavItem === 'aiReports' && (
+            <AITrafficReports />
+          )}
+
           {activeNavItem === 'sustainability' && (
             <SustainabilityPanel />
           )}
 
           {activeNavItem === 'profile' && (
             <UserProfile />
+          )}
+
+          {activeNavItem === 'liveIncidents' && (
+            <IncidentsPage />
           )}
 
           {activeNavItem === 'incidents' && (

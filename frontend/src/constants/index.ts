@@ -1,7 +1,9 @@
 // API Configuration
+// In development, use empty string to let Vite proxy handle the requests
+// In production, use the full API URL
 export const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? process.env.REACT_APP_API_URL || 'https://api.movesmart.ke'
-  : 'http://localhost:8000';
+  : '';
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -24,6 +26,7 @@ export const API_ENDPOINTS = {
     GET_INCIDENTS: '/api/traffic/reports/incidents',
     GET_PREDICTIONS: '/api/traffic/predictions',
     GENERATE_REPORT: '/api/traffic/reports/generate-report',
+    GENERATE_COMPREHENSIVE_REPORT: '/api/traffic/reports/generate-comprehensive-report',
   },
   
   // Traffic Reports endpoints

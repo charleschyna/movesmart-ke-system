@@ -1,13 +1,22 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.http import HttpResponse
+from rest_framework.renderers import JSONRenderer
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from datetime import datetime, timedelta, date
+import io
+import os
 import json
 import math
-from rest_framework.renderers import JSONRenderer
-from django.shortcuts import render
-from .models import TrafficData, TrafficPrediction, Route
-from .serializers import TrafficDataSerializer, TrafficPredictionSerializer, RouteSerializer
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from .models import TrafficData, TrafficReport, TrafficPrediction, Route
+from .serializers import TrafficDataSerializer, TrafficReportSerializer, TrafficPredictionSerializer, RouteSerializer
 from traffic.services.tomtom_service import TomTomService
 import logging
 
@@ -21,6 +30,56 @@ class TrafficDataViewSet(viewsets.ViewSet):
 
 class TrafficReportViewSet(viewsets.ViewSet):
     """API endpoints for generating and retrieving traffic reports."""
+
+    @action(detail=False, methods=['get'])
+    def list_reports(self, request):
+        """List all traffic reports with filtering and pagination."""
+        # Get query parameters for filtering
+        location = request.query_params.get('location')
+        report_type = request.query_params.get('report_type')
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        limit = int(request.query_params.get('limit', 20))
+        offset = int(request.query_params.get('offset', 0))
+        
+        # Build queryset with filters
+        queryset = TrafficReport.objects.all()
+        
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+        
+        if report_type:
+            queryset = queryset.filter(report_type=report_type)
+        
+        if date_from:
+            try:
+                date_from_parsed = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                queryset = queryset.filter(created_at__gte=date_from_parsed)
+            except ValueError:
+                return Response({'error': 'Invalid date_from format'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if date_to:
+            try:
+                date_to_parsed = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                queryset = queryset.filter(created_at__lte=date_to_parsed)
+            except ValueError:
+                return Response({'error': 'Invalid date_to format'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Order by most recent
+        queryset = queryset.order_by('-created_at')
+        
+        # Apply pagination
+        total_count = queryset.count()
+        reports = queryset[offset:offset + limit]
+        
+        serializer = TrafficReportSerializer(reports, many=True)
+        
+        return Response({
+            'count': total_count,
+            'results': serializer.data,
+            'limit': limit,
+            'offset': offset
+        }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='generate-report')
     def generate_report(self, request):
@@ -84,6 +143,140 @@ class TrafficReportViewSet(viewsets.ViewSet):
 
         report_serializer = TrafficReportSerializer(traffic_report)
         return Response(report_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='generate-comprehensive-report')
+    def generate_comprehensive_report(self, request):
+        """Generate a comprehensive traffic report with AI-generated sections based on template type."""
+        logger.info(f"Comprehensive report request data: {request.data}")
+        
+        from traffic.services.geocoding_service import geocoding_service
+        from traffic.services.ai_service import ai_analyzer
+        from traffic.services.tomtom_service import TomTomService
+        from traffic.models import TrafficReport
+        from traffic.serializers import TrafficReportSerializer
+        from datetime import datetime
+        import random
+        
+        # Extract request data
+        location = request.data.get('location')
+        city = request.data.get('city', location)
+        report_type = request.data.get('report_type', 'traffic_summary')
+        date_start = request.data.get('date_start')
+        date_end = request.data.get('date_end')
+        format_type = request.data.get('format', 'pdf')
+        
+        if not location and not city:
+            return Response({'error': 'Location or city is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Use city if location not provided
+        if not location:
+            location = city
+            
+        # Get coordinates for the location
+        coords = geocoding_service.get_coordinates_for_location(location)
+        if not coords:
+            return Response({'error': 'Could not determine coordinates for location'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        latitude, longitude = coords
+        logger.info(f"Generating {report_type} report for {location} at {latitude}, {longitude}")
+        
+        # Parse dates
+        try:
+            if date_start:
+                start_date = datetime.strptime(date_start, '%Y-%m-%d').date()
+            else:
+                start_date = date.today()
+                
+            if date_end:
+                end_date = datetime.strptime(date_end, '%Y-%m-%d').date()
+            else:
+                end_date = date.today()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Fetch comprehensive traffic data
+            tomtom_service = TomTomService()
+            detailed_traffic_data = tomtom_service.get_detailed_traffic_report((latitude, longitude), 15)
+            
+            # Generate AI sections based on report type
+            ai_sections = ai_analyzer.generate_detailed_report_sections(
+                detailed_traffic_data, location, report_type
+            )
+            
+            # Calculate file size (mock)
+            file_size = f"{random.uniform(1.5, 8.0):.1f} MB"
+            
+            # Create comprehensive traffic report
+            traffic_report = TrafficReport.objects.create(
+                title=self._get_report_title(report_type, location, start_date),
+                description=self._get_report_description(report_type, location),
+                report_type=report_type,
+                status='generated',
+                format=format_type,
+                location=location,
+                city=city,
+                latitude=latitude,
+                longitude=longitude,
+                date_start=start_date,
+                date_end=end_date,
+                traffic_data=detailed_traffic_data,
+                traffic_overview=ai_sections.get('traffic_overview', ''),
+                incident_analysis=ai_sections.get('incident_analysis', ''),
+                peak_hours_analysis=ai_sections.get('peak_hours_analysis', ''),
+                route_performance=ai_sections.get('route_performance', ''),
+                ai_recommendations=ai_sections.get('recommendations', ''),
+                insights={
+                    'totalIncidents': ai_sections.get('incident_count', 0),
+                    'avgCongestion': ai_sections.get('congestion_level', 0),
+                    'peakHours': ai_sections.get('peak_hours', '7:30-9:00 AM, 5:00-7:30 PM'),
+                    'topRoutes': ai_sections.get('top_routes', ['Main Route', 'Alternative Route'])
+                },
+                congestion_level=ai_sections.get('congestion_level', 0),
+                avg_speed=ai_sections.get('avg_speed', 0),
+                incident_count=ai_sections.get('incident_count', 0),
+                file_size=file_size,
+                download_url=f'/api/reports/{report_type}-{location.lower().replace(" ", "-")}-{datetime.now().strftime("%Y%m%d")}.{format_type}'
+            )
+            
+            logger.info(f"Created comprehensive report with ID: {traffic_report.id}")
+            
+            response_data = TrafficReportSerializer(traffic_report).data
+            response_data['success'] = True
+            response_data['message'] = 'Comprehensive report generated successfully'
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error generating comprehensive report: {str(e)}")
+            return Response({
+                'error': 'Failed to generate comprehensive report',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _get_report_title(self, report_type: str, location: str, date: date) -> str:
+        """Generate appropriate title based on report type."""
+        titles = {
+            'traffic_summary': f'Daily Traffic Summary - {location} - {date.strftime("%B %d, %Y")}',
+            'incident_analysis': f'Incident Analysis Report - {location} - {date.strftime("%B %d, %Y")}',
+            'route_performance': f'Route Performance Report - {location} - {date.strftime("%B %d, %Y")}',
+            'city_comparison': f'City Comparison Report - {location} - {date.strftime("%B %d, %Y")}',
+            'predictive': f'Predictive Analytics Report - {location} - {date.strftime("%B %d, %Y")}',
+            'custom': f'Custom Report - {location} - {date.strftime("%B %d, %Y")}'
+        }
+        return titles.get(report_type, f'Traffic Report - {location} - {date.strftime("%B %d, %Y")}')
+    
+    def _get_report_description(self, report_type: str, location: str) -> str:
+        """Generate appropriate description based on report type."""
+        descriptions = {
+            'traffic_summary': f'Comprehensive daily traffic analysis for {location} with congestion levels, incident reports, and route performance',
+            'incident_analysis': f'Detailed analysis of traffic incidents in {location} including patterns, causes, and impact assessment',
+            'route_performance': f'Analysis of specific routes in {location} including travel times, bottlenecks, and optimization opportunities',
+            'city_comparison': f'Comparative analysis of {location} with other cities including traffic patterns and performance metrics',
+            'predictive': f'AI-powered predictions for future traffic patterns and potential issues in {location}',
+            'custom': f'Custom traffic analysis report for {location} with selected metrics and timeframes'
+        }
+        return descriptions.get(report_type, f'Traffic analysis report for {location}')
 
     @action(detail=False, methods=['post'], url_path='generate-detailed-report')
     def generate_detailed_report(self, request):

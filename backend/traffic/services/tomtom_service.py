@@ -155,7 +155,7 @@ class TomTomService:
             logger.error(f"Error fetching traffic flow tile: {e}")
             return None
     
-    def get_detailed_traffic_report(self, city_center: tuple, radius_km: float = 10) -> Dict[str, Any]:
+    def get_detailed_traffic_report(self, city_center: tuple, radius_km: float = 30) -> Dict[str, Any]:
         """
         Get comprehensive traffic data for detailed report generation.
         

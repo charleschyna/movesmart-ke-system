@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { 
   ClockIcon, 
   ExclamationTriangleIcon,
@@ -12,9 +11,10 @@ import { TRAFFIC_COLORS } from '../../constants';
 interface StatsCardsProps {
   data: TrafficData | null;
   loading?: boolean;
+  onLiveIncidentsClick?: () => void;
 }
 
-const StatsCards: React.FC<StatsCardsProps> = ({ data, loading = false }) => {
+const StatsCards: React.FC<StatsCardsProps> = ({ data, loading = false, onLiveIncidentsClick }) => {
   const getTrafficColor = (level: number) => {
     if (level < 25) return TRAFFIC_COLORS.LOW;
     if (level < 50) return TRAFFIC_COLORS.MEDIUM;
@@ -86,7 +86,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ data, loading = false }) => {
         subtitle="Per 10km journey"
       />
       
-      <Link to="/incidents" className="contents">
+      <div onClick={onLiveIncidentsClick} className="cursor-pointer">
         <StatCard
           title="Live Incidents"
           value={loading ? '' : data?.liveIncidents || 0}
@@ -94,7 +94,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ data, loading = false }) => {
           color="#f59e0b"
           subtitle="Click to view details"
         />
-      </Link>
+      </div>
       
       <StatCard
         title="AI Insight"

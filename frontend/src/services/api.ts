@@ -255,6 +255,27 @@ class ApiService {
     }
   }
 
+  async generateComprehensiveReport(data: {
+    report_template: string;
+    location: string;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  }): Promise<APIResponse<any>> {
+    try {
+      const response = await this.api.post(API_ENDPOINTS.GENERATE_COMPREHENSIVE_REPORT, data);
+      return {
+        success: true,
+        message: 'Comprehensive report generated successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to generate comprehensive report:', error);
+      throw new Error(error.response?.data?.message || 'Failed to generate comprehensive report');
+    }
+  }
+
   // Route Methods with fallback
   async optimizeRoute(
     start: { lat: number; lng: number },

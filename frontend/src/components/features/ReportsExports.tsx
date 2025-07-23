@@ -30,10 +30,12 @@ import {
   GlobeAltIcon,
   FireIcon,
   BoltIcon,
-  SparklesIcon
+  SparklesIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import { CITY_ROADS } from '../../constants';
 import { toast } from 'react-hot-toast';
+import apiService from '../../services/api';
 
 interface Report {
   id: string;
@@ -93,7 +95,12 @@ const ReportsExports: React.FC = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [locationInput, setLocationInput] = useState('');
+  const [useDropdown, setUseDropdown] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterCity, setFilterCity] = useState<string>('all');
@@ -273,8 +280,21 @@ const ReportsExports: React.FC = () => {
     { value: 'custom', label: 'Custom Reports' }
   ];
 
-  useEffect(() => {
-    setReports(mockReports);
+useEffect(() => {
+    async function fetchReports() {
+      try {
+        const response = await apiService.get('/reports');
+        if (response.success) {
+          setReports(response.data);
+        } else {
+          toast.error(response.message || 'Failed to fetch reports.');
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+        toast.error('Failed to fetch reports. Please try again.');
+      }
+    }
+    fetchReports();
   }, []);
 
   const getCityRoads = (city: string) => {
@@ -312,37 +332,38 @@ const ReportsExports: React.FC = () => {
     }
   };
 
-  const generateReport = async (template: ReportTemplate) => {
+const generateReport = async () => {
+    if (!selectedTemplate) return;
     setIsGenerating(true);
     toast.loading('Generating report...', { duration: 3000 });
 
-    // Simulate report generation
-    setTimeout(() => {
-      const newReport: Report = {
-        id: Date.now().toString(),
-        name: `${template.name} - ${new Date().toLocaleDateString()}`,
-        type: template.type as any,
-        description: template.description,
+    try {
+      const response = await apiService.post('/generate-comprehensive-report', {
+        location: useDropdown ? selectedLocation : locationInput,
         city: exportSettings.filters.city,
-        dateRange: exportSettings.dateRange,
-        status: 'generated',
-        generatedAt: new Date().toISOString(),
-        size: `${(Math.random() * 5 + 1).toFixed(1)} MB`,
+        report_type: selectedTemplate.type,
+        date_start: exportSettings.dateRange.start,
+        date_end: exportSettings.dateRange.end,
         format: exportSettings.format,
-        downloadUrl: `/reports/${template.type}-${Date.now()}.${exportSettings.format}`,
-        insights: {
-          totalIncidents: Math.floor(Math.random() * 100 + 50),
-          avgCongestion: Math.floor(Math.random() * 40 + 40),
-          peakHours: '8:00-9:30 AM, 5:30-7:00 PM',
-          topRoutes: getCityRoads(exportSettings.filters.city).slice(1, 4).map(road => road.name)
-        }
-      };
+      });
 
-      setReports([newReport, ...reports]);
+      if (response.success) {
+        setReports([response.data, ...reports]);
+        toast.success('Report generated successfully!');
+      } else {
+        toast.error(response.message || 'Failed to generate report.');
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report. Please try again.');
+    } finally {
       setIsGenerating(false);
       setShowGenerateModal(false);
-      toast.success('Report generated successfully!');
-    }, 3000);
+      setShowLocationModal(false);
+      setSelectedTemplate(null);
+      setSelectedLocation('');
+      setLocationInput('');
+    }
   };
 
   const downloadReport = (report: Report) => {
@@ -357,9 +378,31 @@ const ReportsExports: React.FC = () => {
     console.log('Sharing report:', report.id);
   };
 
-  const scheduleReport = (template: ReportTemplate) => {
+const scheduleReport = (template: ReportTemplate) => {
+    setSelectedReport(template);
     setShowScheduleModal(true);
-    toast.success('Report scheduled successfully!');
+  };
+
+  const handleScheduleSubmit = async (frequency: 'daily' | 'weekly' | 'monthly', recipients: string[]) => {
+    try {
+      const response = await apiService.post('/schedule-report', {
+        templateId: selectedReport?.id,
+        frequency,
+        recipients,
+        city: exportSettings.filters.city,
+        format: exportSettings.format
+      });
+      
+      if (response.success) {
+        toast.success('Report scheduled successfully!');
+        setShowScheduleModal(false);
+      } else {
+        toast.error(response.message || 'Failed to schedule the report.');
+      }
+    } catch (error) {
+      console.error('Error scheduling report:', error);
+      toast.error('Failed to schedule the report. Please try again.');
+    }
   };
 
   const filteredReports = reports.filter(report => {
@@ -693,7 +736,10 @@ const ReportsExports: React.FC = () => {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => generateReport(template)}
+                    onClick={() => {
+                      setSelectedTemplate(template);
+                      setShowLocationModal(true);
+                    }}
                     disabled={isGenerating}
                     className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1031,6 +1077,86 @@ const ReportsExports: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Location Modal */}
+      <AnimatePresence>
+        {showLocationModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-lg p-6 max-w-sm w-full"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Select Location</h3>
+                <button
+                  onClick={() => setShowLocationModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="w-5 h-5"/>
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      checked={useDropdown}
+                      onChange={() => setUseDropdown(true)}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700">Choose from predefined options</span>
+                  </label>
+                </div>
+                {useDropdown && (
+                  <select
+                    value={selectedLocation}
+                    onChange={(e) => setSelectedLocation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select a city</option>
+                    {cities.map((city) => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="flex items-center">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      checked={!useDropdown}
+                      onChange={() => setUseDropdown(false)}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700">Enter a location directly</span>
+                  </label>
+                </div>
+                {!useDropdown && (
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    placeholder="Enter a location"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
+                <button
+                  onClick={generateReport}
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Generate Report
+                </button>
               </div>
             </motion.div>
           </motion.div>

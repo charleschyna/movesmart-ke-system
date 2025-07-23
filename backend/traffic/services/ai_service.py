@@ -61,11 +61,83 @@ class AITrafficAnalyzer:
         Returns:
             Dictionary with comprehensive AI analysis and recommendations
         """
+        return self._generate_detailed_openai_analysis(detailed_traffic_data, location)
+    
+    def generate_detailed_report_sections(self, traffic_data: Dict[str, Any], location: str, report_type: str) -> Dict[str, str]:
+        """
+        Generate detailed report sections using AI for comprehensive traffic reports.
         
-        if self.use_mock_ai:
-            return self._generate_detailed_mock_analysis(detailed_traffic_data, location)
-        else:
-            return self._generate_detailed_openai_analysis(detailed_traffic_data, location)
+        Args:
+            traffic_data: Raw traffic data from TomTom API
+            location: Location name for context
+            report_type: Type of report (traffic_summary, incident_analysis, etc.)
+            
+        Returns:
+            Dictionary with all report sections
+        """
+        return self._generate_comprehensive_report_sections(traffic_data, location, report_type)
+    
+    def _generate_comprehensive_report_sections(self, traffic_data: Dict[str, Any], location: str, report_type: str) -> Dict[str, str]:
+        """
+        Generate comprehensive report sections based on report type using AI.
+        
+        Args:
+            traffic_data: Raw traffic data from TomTom API
+            location: Location name for context
+            report_type: Type of report (traffic_summary, incident_analysis, etc.)
+            
+        Returns:
+            Dictionary with detailed report sections
+        """
+        
+        # Create comprehensive prompt based on report type
+        prompt = self._create_comprehensive_report_prompt(traffic_data, location, report_type)
+        
+        try:
+            if self.api_type == 'openrouter':
+                response = requests.post(
+                    'https://openrouter.ai/api/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {self.openrouter_api_key}',
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://movesmart.ke',
+                        'X-Title': 'MoveSmart Comprehensive Report Generation'
+                    },
+                    json={
+                        'model': self.ai_model,
+                        'messages': [
+                            {
+                                'role': 'system',
+                                'content': f'''You are an expert traffic analyst for Kenya specializing in {report_type} reports. Generate comprehensive, detailed sections for a professional traffic report. Use real data insights, local context, and provide actionable recommendations. Format the response with clear sections and use emojis for visual appeal.'''
+                            },
+                            {
+                                'role': 'user',
+                                'content': prompt
+                            }
+                        ],
+                        'max_tokens': 2000,
+                        'temperature': 0.7
+                    },
+                    timeout=60
+                )
+            else:
+                # Fallback to basic analysis if no API key
+                return self._generate_mock_comprehensive_sections(traffic_data, location, report_type)
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result['choices'][0]['message']['content']
+                
+                # Parse comprehensive sections from AI response
+                parsed_sections = self._parse_comprehensive_sections(ai_response, traffic_data)
+                return parsed_sections
+            else:
+                logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+                return self._generate_mock_comprehensive_sections(traffic_data, location, report_type)
+                
+        except Exception as e:
+            logger.error(f"Error generating comprehensive report sections: {e}")
+            return self._generate_mock_comprehensive_sections(traffic_data, location, report_type)
     
     def _generate_mock_analysis(self, traffic_data: Dict[str, Any], 
                               incidents_data: List[Dict[str, Any]], 
