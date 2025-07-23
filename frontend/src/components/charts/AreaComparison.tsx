@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ClockIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 import apiService from '../../services/api';
 
 interface AreaComparisonData {
@@ -11,11 +11,13 @@ interface AreaComparisonData {
 interface AreaComparisonProps {
   cityId: string;
   refreshInterval?: number;
+  onExpand?: () => void;
 }
 
 const AreaComparison: React.FC<AreaComparisonProps> = ({ 
   cityId, 
-  refreshInterval = 30000
+  refreshInterval = 30000,
+  onExpand
 }) => {
   const [data, setData] = useState<AreaComparisonData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,9 +100,21 @@ const AreaComparison: React.FC<AreaComparisonProps> = ({
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-xs text-gray-500">Live Data</span>
         </div>
-        <div className="flex items-center space-x-1 text-xs text-gray-500">
-          <ClockIcon className="w-3 h-3" />
-          <span>Updated: {lastUpdate.toLocaleTimeString()}</span>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 text-xs text-gray-500">
+            <ClockIcon className="w-3 h-3" />
+            <span>Updated: {lastUpdate.toLocaleTimeString()}</span>
+          </div>
+          {onExpand && (
+            <button
+              onClick={onExpand}
+              className="flex items-center space-x-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+              title="Expand to full Roads Analytics"
+            >
+              <ArrowsPointingOutIcon className="w-3 h-3" />
+              <span>Expand</span>
+            </button>
+          )}
         </div>
       </div>
 

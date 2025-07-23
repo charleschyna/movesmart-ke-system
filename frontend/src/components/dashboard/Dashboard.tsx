@@ -40,6 +40,7 @@ import AITrafficReports from '../features/AITrafficReports';
 import IncidentsPage from '../incidents/IncidentsPage';
 import DailyCongestionTrends from '../charts/DailyCongestionTrends';
 import AreaComparison from '../charts/AreaComparison';
+import RoadsAnalytics from '../features/RoadsAnalytics';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -371,6 +372,7 @@ const Dashboard: React.FC = () => {
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard Overview', icon: HomeIcon, active: true },
     { id: 'routes', label: 'Route Optimization', icon: MapIcon, active: false },
+    { id: 'roadsAnalytics', label: 'Roads Analytics', icon: ChartBarIcon, active: false },
     { id: 'analytics', label: 'Predictive Analytics', icon: ChartBarIcon, active: false },
     { id: 'reports', label: 'Reports & Exports', icon: DocumentTextIcon, active: false },
     { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon, active: false },
@@ -726,7 +728,11 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="bg-white rounded-lg p-6 shadow-sm">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Area Comparison</h3>
-                      <AreaComparison cityId={selectedCity.id} refreshInterval={30000} />
+                      <AreaComparison 
+                        cityId={selectedCity.id} 
+                        refreshInterval={30000} 
+                        onExpand={() => setActiveNavItem('roadsAnalytics')}
+                      />
                     </div>
                   </div>
                 </div>
@@ -741,6 +747,10 @@ const Dashboard: React.FC = () => {
 
           {activeNavItem === 'routes' && (
             <RouteOptimization />
+          )}
+
+          {activeNavItem === 'roadsAnalytics' && (
+            <RoadsAnalytics />
           )}
 
           {activeNavItem === 'analytics' && (
