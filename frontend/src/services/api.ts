@@ -240,18 +240,63 @@ class ApiService {
     }
   }
 
-  async getTrafficReports(limit?: number): Promise<APIResponse<any[]>> {
+  async getTrafficReports(filters?: {
+    location?: string;
+    report_type?: string;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<APIResponse<any>> {
     try {
-      const params = limit ? `?limit=${limit}` : '';
-      const response = await this.api.get(`${API_ENDPOINTS.TRAFFIC_REPORTS}${params}`);
+      const params = new URLSearchParams();
+      if (filters?.location) params.append('location', filters.location);
+      if (filters?.report_type) params.append('report_type', filters.report_type);
+      if (filters?.date_from) params.append('date_from', filters.date_from);
+      if (filters?.date_to) params.append('date_to', filters.date_to);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      const url = `${API_ENDPOINTS.TRAFFIC_REPORT_LIST}${queryString ? '?' + queryString : ''}`;
+      
+      const response = await this.api.get(url);
       return {
         success: true,
-        message: 'Traffic reports fetched successfully.',
+        message: 'User traffic reports fetched successfully.',
         data: response.data
       };
     } catch (error: any) {
-      console.error('Failed to fetch traffic reports:', error);
+      console.error('Failed to fetch user traffic reports:', error);
       throw new Error(error.response?.data?.message || 'Failed to fetch traffic reports');
+    }
+  }
+
+  async getTrafficReport(reportId: string): Promise<APIResponse<any>> {
+    try {
+      const response = await this.api.get(`${API_ENDPOINTS.TRAFFIC_REPORT_GET}/${reportId}/get_report/`);
+      return {
+        success: true,
+        message: 'Traffic report fetched successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch traffic report:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch traffic report');
+    }
+  }
+
+  async deleteTrafficReport(reportId: string): Promise<APIResponse<void>> {
+    try {
+      const response = await this.api.delete(`${API_ENDPOINTS.TRAFFIC_REPORT_DELETE}/${reportId}/delete_report/`);
+      return {
+        success: true,
+        message: 'Traffic report deleted successfully.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to delete traffic report:', error);
+      throw new Error(error.response?.data?.message || 'Failed to delete traffic report');
     }
   }
 

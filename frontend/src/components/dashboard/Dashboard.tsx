@@ -38,6 +38,8 @@ import StatsCards from './StatsCards';
 import TrafficReportSection from '../features/TrafficReportSection';
 import AITrafficReports from '../features/AITrafficReports';
 import IncidentsPage from '../incidents/IncidentsPage';
+import DailyCongestionTrends from '../charts/DailyCongestionTrends';
+import AreaComparison from '../charts/AreaComparison';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -370,15 +372,15 @@ const Dashboard: React.FC = () => {
     { id: 'dashboard', label: 'Dashboard Overview', icon: HomeIcon, active: true },
     { id: 'routes', label: 'Route Optimization', icon: MapIcon, active: false },
     { id: 'analytics', label: 'Predictive Analytics', icon: ChartBarIcon, active: false },
-    { id: 'simulation', label: 'Scenario Simulation', icon: BeakerIcon, active: false },
     { id: 'reports', label: 'Reports & Exports', icon: DocumentTextIcon, active: false },
     { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon, active: false },
-    { id: 'sustainability', label: 'Sustainability Panel', icon: GlobeAltIcon, active: false },
     { id: 'profile', label: 'User Profile', icon: UserIcon, active: false },
     { id: 'liveIncidents', label: 'Live Incidents', icon: ExclamationTriangleIcon, active: false },
     { id: 'incidents', label: 'Incident Reporting', icon: ExclamationCircleIcon, active: false },
     { id: 'notifications', label: 'Notification Center', icon: BellIcon, active: false },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, active: false },
+    { id: 'sustainability', label: 'Sustainability Panel', icon: GlobeAltIcon, active: false },
+    { id: 'simulation', label: 'Scenario Simulation', icon: BeakerIcon, active: false },
   ];
 
   // Get dynamic user data from localStorage or context
@@ -543,34 +545,6 @@ const Dashboard: React.FC = () => {
           </div>
         </nav>
 
-        {/* Enhanced AI Insights Section */}
-        {!isSidebarCollapsed && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="p-4 border-t border-gray-100"
-          >
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                  <LightBulbIcon className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-sm font-semibold text-gray-900">AI Insights</span>
-              </div>
-              <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-                Get AI-powered traffic recommendations and predictive analytics
-              </p>
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-sm"
-              >
-                Explore Features
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
       </motion.div>
 
       {/* Main Content */}
@@ -748,15 +722,11 @@ const Dashboard: React.FC = () => {
                   <div className="grid grid-cols-2 gap-6 mt-6">
                     <div className="bg-white rounded-lg p-6 shadow-sm">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Congestion Trends</h3>
-                      <div className="h-32 bg-gray-50 rounded flex items-center justify-center">
-                        <span className="text-gray-400">Chart placeholder</span>
-                      </div>
+                      <DailyCongestionTrends cityId={selectedCity.id} refreshInterval={30000} />
                     </div>
                     <div className="bg-white rounded-lg p-6 shadow-sm">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Area Comparison</h3>
-                      <div className="h-32 bg-gray-50 rounded flex items-center justify-center">
-                        <span className="text-gray-400">Chart placeholder</span>
-                      </div>
+                      <AreaComparison cityId={selectedCity.id} refreshInterval={30000} />
                     </div>
                   </div>
                 </div>

@@ -83,21 +83,7 @@ const Signup: React.FC = () => {
 
       // Use the authentication context to register the user
       // This will automatically log them in and set up the session
-      // For now, we'll simulate the registration and redirect to dashboard
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Store user data for demo purposes
-      const userData = {
-        id: Date.now(),
-        username: formData.username,
-        email: formData.email,
-        first_name: formData.username,
-        last_name: '',
-      };
-      
-      // Store in localStorage for demo
-      localStorage.setItem('demo_user', JSON.stringify(userData));
-      localStorage.setItem('demo_token', 'demo_token_' + Date.now());
       
       toast.success(`Account created successfully! Welcome to MoveSmart KE, ${formData.username}!`);
       navigate('/dashboard');

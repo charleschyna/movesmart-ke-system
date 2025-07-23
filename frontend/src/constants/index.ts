@@ -31,6 +31,9 @@ export const API_ENDPOINTS = {
   
   // Traffic Reports endpoints
   TRAFFIC_REPORTS: '/api/traffic/reports/',
+  TRAFFIC_REPORT_LIST: '/api/traffic/reports/list_reports/',
+  TRAFFIC_REPORT_GET: '/api/traffic/reports',
+  TRAFFIC_REPORT_DELETE: '/api/traffic/reports',
   TRAFFIC_REPORT_GENERATE: '/api/traffic/reports/generate-report/',
   TRAFFIC_REPORT_DETAILED: '/api/traffic/reports/generate-detailed-report/',
   

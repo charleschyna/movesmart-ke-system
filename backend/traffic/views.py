@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
+from rest_framework.permissions import IsAuthenticated
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -30,10 +31,11 @@ class TrafficDataViewSet(viewsets.ViewSet):
 
 class TrafficReportViewSet(viewsets.ViewSet):
     """API endpoints for generating and retrieving traffic reports."""
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'])
     def list_reports(self, request):
-        """List all traffic reports with filtering and pagination."""
+        """List user's traffic reports with filtering and pagination."""
         # Get query parameters for filtering
         location = request.query_params.get('location')
         report_type = request.query_params.get('report_type')
@@ -42,8 +44,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
         limit = int(request.query_params.get('limit', 20))
         offset = int(request.query_params.get('offset', 0))
         
-        # Build queryset with filters
-        queryset = TrafficReport.objects.all()
+        # Build queryset with filters - only show user's reports
+        queryset = TrafficReport.objects.filter(user=request.user)
         
         if location:
             queryset = queryset.filter(location__icontains=location)
@@ -80,6 +82,49 @@ class TrafficReportViewSet(viewsets.ViewSet):
             'limit': limit,
             'offset': offset
         }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def get_report(self, request, pk=None):
+        """Get a specific traffic report by ID (only if user owns it)."""
+        try:
+            # Get the report, but only if it belongs to the current user
+            traffic_report = get_object_or_404(TrafficReport, id=pk, user=request.user)
+            serializer = TrafficReportSerializer(traffic_report)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Http404:
+            return Response(
+                {'error': 'Report not found or you do not have permission to access it'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving report {pk}: {str(e)}")
+            return Response(
+                {'error': 'Failed to retrieve report'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['delete'])
+    def delete_report(self, request, pk=None):
+        """Delete a specific traffic report by ID (only if user owns it)."""
+        try:
+            # Get the report, but only if it belongs to the current user
+            traffic_report = get_object_or_404(TrafficReport, id=pk, user=request.user)
+            traffic_report.delete()
+            return Response(
+                {'message': 'Report deleted successfully'}, 
+                status=status.HTTP_200_OK
+            )
+        except Http404:
+            return Response(
+                {'error': 'Report not found or you do not have permission to delete it'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error deleting report {pk}: {str(e)}")
+            return Response(
+                {'error': 'Failed to delete report'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['post'], url_path='generate-report')
     def generate_report(self, request):
@@ -138,7 +183,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
             ai_recommendations=ai_result['recommendations'],
             congestion_level=ai_result.get('congestion_level', 0),
             avg_speed=ai_result.get('avg_speed', 0),
-            incident_count=len(incidents_data.get('incidents', []))
+            incident_count=len(incidents_data.get('incidents', [])),
+            user=request.user  # Associate report with authenticated user
         )
 
         report_serializer = TrafficReportSerializer(traffic_report)
@@ -236,7 +282,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
                 avg_speed=ai_sections.get('avg_speed', 0),
                 incident_count=ai_sections.get('incident_count', 0),
                 file_size=file_size,
-                download_url=f'/api/reports/{report_type}-{location.lower().replace(" ", "-")}-{datetime.now().strftime("%Y%m%d")}.{format_type}'
+                download_url=f'/api/reports/{report_type}-{location.lower().replace(" ", "-")}-{datetime.now().strftime("%Y%m%d")}.{format_type}',
+                user=request.user  # Associate report with authenticated user
             )
             
             logger.info(f"Created comprehensive report with ID: {traffic_report.id}")
@@ -336,7 +383,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
             ai_recommendations=ai_result['recommendations'],
             congestion_level=ai_result.get('congestion_level', 0),
             avg_speed=ai_result.get('avg_speed', 0),
-            incident_count=ai_result.get('incident_count', 0)
+            incident_count=ai_result.get('incident_count', 0),
+            user=request.user  # Associate report with authenticated user
         )
 
         # Add additional metadata for detailed report
