@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -31,7 +31,30 @@ class TrafficDataViewSet(viewsets.ViewSet):
 
 class TrafficReportViewSet(viewsets.ViewSet):
     """API endpoints for generating and retrieving traffic reports."""
-    permission_classes = [IsAuthenticated]
+    
+    def get_permissions(self):
+        """
+        Instantiate and return the list of permissions that this view requires.
+        Make dashboard endpoints and report generation endpoints public for easier access.
+        """
+        public_actions = [
+            'city_summary', 
+            'live_traffic', 
+            'incidents', 
+            'congestion_trends',
+            'generate_report',
+            'generate_detailed_report', 
+            'generate_comprehensive_report',
+            'reverse_geocode',
+            'geocode'
+        ]
+        
+        if self.action in public_actions:
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+            
+        return [permission() for permission in permission_classes]
 
     @action(detail=False, methods=['get'])
     def list_reports(self, request):
@@ -98,6 +121,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
             )
         except Exception as e:
             logger.error(f"Error retrieving report {pk}: {str(e)}")
+            
             return Response(
                 {'error': 'Failed to retrieve report'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -121,6 +145,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
             )
         except Exception as e:
             logger.error(f"Error deleting report {pk}: {str(e)}")
+            
             return Response(
                 {'error': 'Failed to delete report'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -179,12 +204,12 @@ class TrafficReportViewSet(viewsets.ViewSet):
             latitude=latitude,
             longitude=longitude,
             traffic_data=traffic_data,
-            ai_analysis=ai_result['analysis'],
+            traffic_overview=ai_result['analysis'],  # Map ai_analysis to traffic_overview field
             ai_recommendations=ai_result['recommendations'],
             congestion_level=ai_result.get('congestion_level', 0),
             avg_speed=ai_result.get('avg_speed', 0),
             incident_count=len(incidents_data.get('incidents', [])),
-            user=request.user  # Associate report with authenticated user
+            user=request.user if request.user.is_authenticated else None  # Associate report with authenticated user if available
         )
 
         report_serializer = TrafficReportSerializer(traffic_report)
@@ -283,7 +308,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
                 incident_count=ai_sections.get('incident_count', 0),
                 file_size=file_size,
                 download_url=f'/api/reports/{report_type}-{location.lower().replace(" ", "-")}-{datetime.now().strftime("%Y%m%d")}.{format_type}',
-                user=request.user  # Associate report with authenticated user
+                user=request.user if request.user.is_authenticated else None  # Associate report with authenticated user if available
             )
             
             logger.info(f"Created comprehensive report with ID: {traffic_report.id}")
@@ -296,6 +321,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
             
         except Exception as e:
             logger.error(f"Error generating comprehensive report: {str(e)}")
+            
             return Response({
                 'error': 'Failed to generate comprehensive report',
                 'details': str(e)
@@ -328,6 +354,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='generate-detailed-report')
     def generate_detailed_report(self, request):
         logger.info(f"Received request data: {request.data}")
+        
         """Generate a comprehensive traffic report with detailed analysis."""
         from traffic.services.geocoding_service import geocoding_service
         from traffic.services.ai_service import ai_analyzer
@@ -379,12 +406,12 @@ class TrafficReportViewSet(viewsets.ViewSet):
             latitude=latitude,
             longitude=longitude,
             traffic_data=detailed_traffic_data,
-            ai_analysis=ai_result['analysis'],
+            traffic_overview=ai_result['analysis'],  # Map ai_analysis to traffic_overview field
             ai_recommendations=ai_result['recommendations'],
             congestion_level=ai_result.get('congestion_level', 0),
             avg_speed=ai_result.get('avg_speed', 0),
             incident_count=ai_result.get('incident_count', 0),
-            user=request.user  # Associate report with authenticated user
+            user=request.user if request.user.is_authenticated else None  # Associate report with authenticated user if available
         )
 
         # Add additional metadata for detailed report
@@ -465,6 +492,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Error in reverse geocoding: {e}")
+            
             return Response({
                 'error': 'Failed to reverse geocode location'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -546,7 +574,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
             return Response(formatted_data, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f'Error fetching live traffic data for {city}: {str(e)}')
+            logger.error(f"Error fetching live traffic data for {city}: {str(e)}")
+            
             return Response(
                 {'error': 'Failed to fetch live traffic data'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -582,7 +611,8 @@ class TrafficReportViewSet(viewsets.ViewSet):
             return HttpResponse(json.dumps(summary_data), content_type='application/json', status=200)
             
         except Exception as e:
-            logger.error(f'Error fetching city summary for {city}: {str(e)}')
+            logger.error(f"Error fetching city summary for {city}: {str(e)}")
+            
             return Response(
                 {'error': 'Failed to fetch city traffic summary'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -624,9 +654,74 @@ class TrafficReportViewSet(viewsets.ViewSet):
             return HttpResponse(json.dumps(incidents_list), content_type='application/json', status=200)
             
         except Exception as e:
-            logger.error(f'Error fetching incidents for {city}: {str(e)}')
+            logger.error(f"Error fetching incidents for {city}: {str(e)}")
+            
             return Response(
                 {'error': 'Failed to fetch traffic incidents'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['get'])
+    def congestion_trends(self, request):
+        """Get real-time congestion trends for a city."""
+        from traffic.services.realtime_traffic_service import realtime_traffic_service
+        import asyncio
+        
+        city = request.query_params.get('city', '').lower()
+        hours = int(request.query_params.get('hours', 24))
+        
+        city_coords = {
+            'nairobi': (-1.2921, 36.8219),
+            'mombasa': (-4.0435, 39.6682),
+            'kisumu': (-0.1022, 34.7617),
+            'nakuru': (-0.3031, 36.0800),
+            'eldoret': (0.5143, 35.2698)
+        }
+        
+        if city not in city_coords:
+            return Response(
+                {'error': f'City {city} not supported. Available cities: {list(city_coords.keys())}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if hours < 1 or hours > 168:  # Max 1 week
+            return Response(
+                {'error': 'Hours must be between 1 and 168 (1 week)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Run async function in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                trends_data = loop.run_until_complete(
+                    realtime_traffic_service.get_realtime_congestion_trends(city, hours)
+                )
+            finally:
+                loop.close()
+            
+            response_data = {
+                'city': city.title(),
+                'timeRange': f'{hours}h',
+                'dataPoints': len(trends_data),
+                'trends': trends_data,
+                'lastUpdate': trends_data[-1]['timestamp'] if trends_data else None,
+                'realTimeEnabled': True
+            }
+            
+            return HttpResponse(
+                json.dumps(response_data), 
+                content_type='application/json', 
+                status=200
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching congestion trends for {city}: {str(e)}")
+            
+            return Response(
+                {'error': 'Failed to fetch congestion trends'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

@@ -210,7 +210,7 @@ const [showReportPopup, setShowReportPopup] = useState(false);
     try {
       const requestData = {
         location: location.trim() || selectedCity.name,
-        report_type: 'location',
+        report_type: 'traffic_summary',  // Use valid choice from backend model
         use_current_location: useCurrentLocation,
         ...(reportType === 'detailed' && { radius_km: radius })
       };

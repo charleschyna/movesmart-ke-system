@@ -41,6 +41,7 @@ import IncidentsPage from '../incidents/IncidentsPage';
 import DailyCongestionTrends from '../charts/DailyCongestionTrends';
 import AreaComparison from '../charts/AreaComparison';
 import RoadsAnalytics from '../features/RoadsAnalytics';
+import CongestionAnalytics from '../features/CongestionAnalytics';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -373,6 +374,7 @@ const Dashboard: React.FC = () => {
     { id: 'dashboard', label: 'Dashboard Overview', icon: HomeIcon, active: true },
     { id: 'routes', label: 'Route Optimization', icon: MapIcon, active: false },
     { id: 'roadsAnalytics', label: 'Roads Analytics', icon: ChartBarIcon, active: false },
+    { id: 'congestionAnalytics', label: 'Congestion Analytics', icon: ClockIcon, active: false },
     { id: 'analytics', label: 'Predictive Analytics', icon: ChartBarIcon, active: false },
     { id: 'reports', label: 'Reports & Exports', icon: DocumentTextIcon, active: false },
     { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon, active: false },
@@ -724,7 +726,11 @@ const Dashboard: React.FC = () => {
                   <div className="grid grid-cols-2 gap-6 mt-6">
                     <div className="bg-white rounded-lg p-6 shadow-sm">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Congestion Trends</h3>
-                      <DailyCongestionTrends cityId={selectedCity.id} refreshInterval={30000} />
+                      <DailyCongestionTrends 
+                        cityId={selectedCity.id} 
+                        refreshInterval={30000}
+                        onExpand={() => setActiveNavItem('congestionAnalytics')}
+                      />
                     </div>
                     <div className="bg-white rounded-lg p-6 shadow-sm">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Area Comparison</h3>
@@ -751,6 +757,10 @@ const Dashboard: React.FC = () => {
 
           {activeNavItem === 'roadsAnalytics' && (
             <RoadsAnalytics />
+          )}
+
+          {activeNavItem === 'congestionAnalytics' && (
+            <CongestionAnalytics />
           )}
 
           {activeNavItem === 'analytics' && (

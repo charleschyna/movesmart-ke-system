@@ -586,6 +586,26 @@ class ApiService {
     }
   }
 
+  // Congestion Trends Method
+  async getCongestionTrends(cityId: string, timeRange: string): Promise<APIResponse<any>> {
+    try {
+      const params = new URLSearchParams({
+        city_id: cityId,
+        time_range: timeRange
+      });
+      
+      const response = await this.api.get(`${API_ENDPOINTS.ANALYTICS.CONGESTION_TRENDS}?${params}`);
+      return {
+        success: true,
+        message: 'Successfully fetched congestion trends data.',
+        data: response.data
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch congestion trends:', error);
+      throw new Error(error.response?.data?.message || 'Failed to fetch congestion trends');
+    }
+  }
+
 
   // Reverse Geocode Method
   async reverseGeocode(latitude: number, longitude: number): Promise<{ address: string }> {

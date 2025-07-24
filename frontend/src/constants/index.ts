@@ -54,6 +54,7 @@ export const API_ENDPOINTS = {
   // Analytics endpoints
   ANALYTICS: {
     GET_DATA: '/api/analytics/data',
+    CONGESTION_TRENDS: '/api/traffic/congestion_trends',
   },
   
   // Simulation endpoints
