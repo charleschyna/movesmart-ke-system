@@ -42,13 +42,17 @@ export interface RouteOptions {
 // Incident Types
 export interface Incident {
   id: string;
-  type: 'accident' | 'police' | 'roadworks' | 'weather' | 'other';
-  location: Location;
+  type: 'accident' | 'construction' | 'traffic_jam' | 'weather' | 'other';
   description: string;
   severity: 'low' | 'medium' | 'high';
-  timestamp: string;
-  userId: string;
-  verified: boolean;
+  status: 'active' | 'resolved' | 'pending';
+  latitude: number;
+  longitude: number;
+  reportedAt: string;
+  location: string;
+  cityId: string;
+  userId?: string;
+  verified?: boolean;
   photo?: string;
 }
 

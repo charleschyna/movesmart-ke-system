@@ -14,6 +14,7 @@ import {
   CommandLineIcon,
   CpuChipIcon
 } from '@heroicons/react/24/outline';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface NotificationItem {
   id: string;
@@ -50,8 +51,9 @@ const Navbar: React.FC<NavbarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  const { theme, setTheme } = useTheme();
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -142,7 +144,7 @@ const Navbar: React.FC<NavbarProps> = ({
       className={`relative bg-white/95 backdrop-blur-xl border-b border-gray-200/60 shadow-lg ${className}`}
     >
       {/* Gradient background overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/50 via-transparent to-blue-50/50 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-50/50 via-transparent to-blue-50/50 pointer-events-none" />
       
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
@@ -156,7 +158,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center space-x-3">
               <motion.div 
                 whileHover={{ scale: 1.1, rotate: 10 }}
-                className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg"
+                className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg"
               >
                 <MapPinIcon className="w-6 h-6 text-white" />
               </motion.div>
@@ -164,7 +166,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   MoveSmart
                 </h1>
-                <span className="text-xs text-emerald-600 font-semibold tracking-wide">KENYA</span>
+                <span className="text-xs text-blue-600 font-semibold tracking-wide">KENYA</span>
               </div>
             </div>
           </motion.div>
@@ -178,14 +180,14 @@ const Navbar: React.FC<NavbarProps> = ({
           >
             <form onSubmit={handleSearch} className="relative w-full">
               <div className="relative group">
-                <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search locations, routes, or incidents..."
                   className="w-full pl-12 pr-16 py-3.5 bg-white/80 border border-gray-200/60 rounded-2xl text-sm placeholder-gray-400 
-                           focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-300 
+                           focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-300 
                            shadow-sm hover:shadow-md transition-all duration-300 backdrop-blur-sm"
                 />
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
@@ -196,7 +198,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="p-1 text-gray-400 hover:text-emerald-600 transition-colors"
+                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                   >
                     <CommandLineIcon className="w-4 h-4" />
                   </motion.button>
@@ -228,7 +230,7 @@ const Navbar: React.FC<NavbarProps> = ({
               <div className="w-px h-5 bg-gray-300" />
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                   <span className="text-xs text-gray-600 font-medium">System Online</span>
                 </div>
               </div>
@@ -238,17 +240,17 @@ const Navbar: React.FC<NavbarProps> = ({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200"
             >
-              {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
+              {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </motion.button>
 
             {/* AI Assistant */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-200 group"
+              className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 group"
             >
               <CpuChipIcon className="w-5 h-5 group-hover:animate-pulse" />
             </motion.button>
@@ -284,10 +286,10 @@ const Navbar: React.FC<NavbarProps> = ({
                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
                     className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200/60 backdrop-blur-xl overflow-hidden z-50"
                   >
-                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-gray-100">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-100">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-gray-900">Notifications</h3>
-                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
                           {unreadCount} new
                         </span>
                       </div>
@@ -329,7 +331,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     
                     <div className="p-3 bg-gray-50 border-t border-gray-100">
-                      <button className="w-full text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors">
+                      <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors">
                         View all notifications
                       </button>
                     </div>
@@ -347,14 +349,14 @@ const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center space-x-3 bg-white/80 border border-gray-200/60 rounded-2xl px-4 py-2.5 shadow-sm hover:shadow-md transition-all duration-300 backdrop-blur-sm group"
               >
                 <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
                     <span className="text-white font-bold text-sm">{user.initials}</span>
                   </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-blue-500 border-2 border-white rounded-full" />
                 </div>
                 
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                  <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                     {user.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -376,15 +378,15 @@ const Navbar: React.FC<NavbarProps> = ({
                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
                     className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200/60 backdrop-blur-xl overflow-hidden z-50"
                   >
-                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-gray-100">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-gray-100">
                       <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-sm">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
                           <span className="text-white font-bold">{user.initials}</span>
                         </div>
                         <div>
                           <p className="font-semibold text-gray-900">{user.name}</p>
                           <p className="text-sm text-gray-600">{user.email}</p>
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
                             {user.role}
                           </span>
                         </div>

@@ -11,8 +11,6 @@ import {
   XCircleIcon,
   InformationCircleIcon,
   ArrowPathIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   BookmarkIcon,
   ShareIcon,
   PrinterIcon,
@@ -57,20 +55,8 @@ const TrafficReportSection: React.FC<TrafficReportSectionProps> = ({ selectedCit
   const [loading, setLoading] = useState(false);
   const [currentReport, setCurrentReport] = useState<TrafficReport | null>(null);
   const [reportHistory, setReportHistory] = useState<TrafficReport[]>([]);
-  const [expandedReport, setExpandedReport] = useState<number | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
 
-  // Load report history from localStorage
-  useEffect(() => {
-    const savedHistory = localStorage.getItem(`traffic_reports_${selectedCity.id}`);
-    if (savedHistory) {
-      try {
-        setReportHistory(JSON.parse(savedHistory));
-      } catch (error) {
-        console.error('Error loading report history:', error);
-      }
-    }
-  }, [selectedCity.id]);
 
   // Save report history to localStorage
   const saveReportHistory = (reports: TrafficReport[]) => {
@@ -249,7 +235,7 @@ setCurrentReport(report);
 
   // Get congestion level color and text
   const getCongestionInfo = (level: number) => {
-    if (level < 25) return { color: 'text-green-600', bg: 'bg-green-50', text: 'Good' };
+    if (level < 25) return { color: 'text-blue-600', bg: 'bg-blue-50', text: 'Good' };
     if (level < 50) return { color: 'text-yellow-600', bg: 'bg-yellow-50', text: 'Moderate' };
     if (level < 75) return { color: 'text-orange-600', bg: 'bg-orange-50', text: 'Heavy' };
     return { color: 'text-red-600', bg: 'bg-red-50', text: 'Severe' };
@@ -283,7 +269,7 @@ setCurrentReport(report);
       {/* Report Generation Section */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center space-x-2 mb-4">
-          <DocumentTextIcon className="w-5 h-5 text-green-600" />
+          <DocumentTextIcon className="w-5 h-5 text-blue-600" />
           <h3 className="text-lg font-semibold text-gray-900">Generate Traffic Report</h3>
         </div>
         
@@ -300,7 +286,7 @@ setCurrentReport(report);
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder={`Enter location (e.g., "Nairobi CBD", "Westlands") or coordinates`}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={loading}
               />
             </div>
@@ -330,7 +316,7 @@ setCurrentReport(report);
                 onClick={() => setReportType('basic')}
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   reportType === 'basic'
-                    ? 'bg-green-50 border-green-300 text-green-700'
+                    ? 'bg-blue-50 border-blue-300 text-blue-700'
                     : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -340,7 +326,7 @@ setCurrentReport(report);
                 onClick={() => setReportType('detailed')}
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   reportType === 'detailed'
-                    ? 'bg-green-50 border-green-300 text-green-700'
+                    ? 'bg-blue-50 border-blue-300 text-blue-700'
                     : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -374,7 +360,7 @@ setCurrentReport(report);
           <button
             onClick={generateReport}
             disabled={loading || (!location.trim() && !useCurrentLocation)}
-            className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -392,67 +378,6 @@ setCurrentReport(report);
       </div>
 
 
-      {/* Report History */}
-      {reportHistory.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Reports</h3>
-          <div className="space-y-2">
-            {reportHistory.map((report) => (
-              <div key={report.id} className="border border-gray-200 rounded-lg">
-                <button
-                  onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <DocumentTextIcon className="w-5 h-5 text-gray-400" />
-                    <div className="text-left">
-                      <div className="font-medium text-gray-900">{report.location}</div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(report.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${getCongestionInfo(report.congestion_level).bg} ${getCongestionInfo(report.congestion_level).color}`}>
-                      {report.congestion_level}%
-                    </div>
-                    {expandedReport === report.id ? (
-                      <ChevronUpIcon className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </button>
-                
-                {expandedReport === report.id && (
-                  <div className="border-t border-gray-200 p-4">
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-gray-900">{report.congestion_level}%</div>
-                        <div className="text-sm text-gray-500">Congestion</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-gray-900">{report.avg_speed.toFixed(1)} km/h</div>
-                        <div className="text-sm text-gray-500">Avg Speed</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-gray-900">{report.incident_count}</div>
-                        <div className="text-sm text-gray-500">Incidents</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setCurrentReport(report)}
-                      className="w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-                    >
-                      View Full Report
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
 {/* Report Popup */}
       {showReportPopup && currentReport && (
@@ -474,7 +399,7 @@ setCurrentReport(report);
               </button>
               <button
                 onClick={() => { setShowReportPopup(false); setCurrentReport(null); handleDownload(currentReport); }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Download
               </button>

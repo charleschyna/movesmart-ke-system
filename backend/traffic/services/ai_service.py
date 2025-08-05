@@ -108,7 +108,7 @@ class AITrafficAnalyzer:
                         'messages': [
                             {
                                 'role': 'system',
-                                'content': f'''You are an expert traffic analyst for Kenya specializing in {report_type} reports. Generate comprehensive, detailed sections for a professional traffic report. Use real data insights, local context, and provide actionable recommendations. Format the response with clear sections and use emojis for visual appeal.'''
+                                'content': f'''You are an expert traffic analyst for Kenya specializing in {report_type} reports. Generate comprehensive, detailed sections for a professional traffic report Each report should not be less than 130 words . Use real data insights, local context, and provide actionable recommendations. Format the response with clear sections and use emojis for visual appeal.'''
                             },
                             {
                                 'role': 'user',
@@ -323,7 +323,8 @@ class AITrafficAnalyzer:
                               location: str) -> str:
         """Create a prompt for OpenAI API."""
         
-        prompt = f"""Analyze the following traffic data for {location} and provide insights:
+        prompt = f"""Analyze the following traffic data for {location} and provide insights. Not less than 60 words 
+        :
 
 TRAFFIC DATA:
 {json.dumps(traffic_data, indent=2)}
@@ -884,7 +885,7 @@ RECOMMENDATIONS: [practical, specific recommendations with road names and timing
             
             # Format road information
             road_info = f"{road_from}" + (f" to {road_to}" if road_to else "")
-            delay_info = f" (Delay: {delay//60}min)" if delay > 0 else ""
+            delay_info = f" (Delay: {delay//60}min)" if delay is not None and delay > 0 else ""
             time_info = f" - Started: {start_time[:16]}" if start_time else ""
             
             incident_summary = f"• {description} on {road_info}{delay_info}{time_info}"
@@ -942,15 +943,15 @@ RECOMMENDATIONS: [practical, specific recommendations with road names and timing
             avg_speed = (distance / (travel_time / 60)) if travel_time > 0 else 0
             
             # Determine traffic condition
-            if traffic_delay > 15:
+            if traffic_delay is not None and traffic_delay > 15:
                 condition = "🔴 Heavy delays"
-            elif traffic_delay > 5:
+            elif traffic_delay is not None and traffic_delay > 5:
                 condition = "🟡 Moderate delays"
             else:
                 condition = "🟢 Smooth flow"
             
             route_summary = f"• **{route_name}**: {travel_time}min ({distance:.1f}km) - {condition}"
-            if traffic_delay > 0:
+            if traffic_delay is not None and traffic_delay > 0:
                 route_summary += f" (+{traffic_delay}min delay)"
             if avg_speed > 0:
                 route_summary += f" | Avg: {avg_speed:.0f}km/h"
@@ -1011,8 +1012,20 @@ RECOMMENDATIONS: [practical, specific recommendations with road names and timing
     
     def _create_comprehensive_report_prompt(self, traffic_data: Dict[str, Any], location: str, report_type: str) -> str:
         """Create comprehensive report prompt based on report type."""
-        # Enhanced prompt for comprehensive reports
-        return f"Generate a comprehensive {report_type} report for {location} using the provided traffic data. Include detailed analysis and actionable insights."
+        # Enhanced prompt for comprehensive reports with detailed requirements
+        return f"""Generate a comprehensive {report_type} report for {location} using the provided traffic data.
+        
+Each section must be detailed and informative:
+
+1. TRAFFIC_OVERVIEW: Provide a thorough overview of current traffic conditions including weather impact, congestion levels, and speed analysis (minimum 100 words).
+2. INCIDENT_ANALYSIS: Break down each incident affecting traffic, categorize by type, and include impact assessment (minimum 80 words).
+3. PEAK_HOURS_ANALYSIS: Discuss traffic behavior during peak times, identifying hotspots and typical conditions (minimum 80 words).
+4. ROUTE_PERFORMANCE: Assess the performance of major routes, providing specifics on delays and alternative suggestions (minimum 80 words).
+5. RECOMMENDATIONS: Offer clear and practical advice for drivers, including road safety tips and time management strategies (minimum 100 words).
+
+Ensure the overall response is cohesive and provides useful insights into Kenyan traffic patterns specifically. The total text should be no less than 500 words to offer comprehensive value to users.
+
+Traffic Data: {json.dumps(traffic_data, indent=2)[:500]}..."""
     
     def _parse_comprehensive_sections(self, response: str, traffic_data: Dict[str, Any]) -> Dict[str, str]:
         """Parse comprehensive AI response into sections."""

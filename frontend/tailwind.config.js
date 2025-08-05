@@ -21,11 +21,11 @@ module.exports = {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
-  			kenya: {
-  				red: '#ce1126',
-  				green: '#007a3d',
-  				black: '#000000'
-  			},
+			kenya: {
+				red: '#ce1126',
+				blue: '#1e40af',
+				black: '#000000'
+			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

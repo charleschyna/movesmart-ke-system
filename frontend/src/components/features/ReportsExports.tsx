@@ -280,10 +280,10 @@ const ReportsExports: React.FC = () => {
     { value: 'custom', label: 'Custom Reports' }
   ];
 
-useEffect(() => {
+  useEffect(() => {
     async function fetchReports() {
       try {
-        const response = await apiService.get('/reports');
+        const response = await apiService.getTrafficReports();
         if (response.success) {
           setReports(response.data);
         } else {
@@ -338,7 +338,7 @@ const generateReport = async () => {
     toast.loading('Generating report...', { duration: 3000 });
 
     try {
-      const response = await apiService.post('/generate-comprehensive-report', {
+      const response = await apiService.generateComprehensiveReport({
         location: useDropdown ? selectedLocation : locationInput,
         city: exportSettings.filters.city,
         report_type: selectedTemplate.type,
@@ -378,15 +378,15 @@ const generateReport = async () => {
     console.log('Sharing report:', report.id);
   };
 
-const scheduleReport = (template: ReportTemplate) => {
-    setSelectedReport(template);
+  const scheduleReport = (template: ReportTemplate) => {
+    setSelectedTemplate(template);
     setShowScheduleModal(true);
   };
 
   const handleScheduleSubmit = async (frequency: 'daily' | 'weekly' | 'monthly', recipients: string[]) => {
     try {
       const response = await apiService.post('/schedule-report', {
-        templateId: selectedReport?.id,
+        templateId: selectedTemplate?.id,
         frequency,
         recipients,
         city: exportSettings.filters.city,
@@ -396,6 +396,7 @@ const scheduleReport = (template: ReportTemplate) => {
       if (response.success) {
         toast.success('Report scheduled successfully!');
         setShowScheduleModal(false);
+        setSelectedTemplate(null);
       } else {
         toast.error(response.message || 'Failed to schedule the report.');
       }
@@ -1064,8 +1065,11 @@ const scheduleReport = (template: ReportTemplate) => {
                         key={template.id}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => generateReport(template)}
-                        className="p-4 border border-gray-200 rounded-lg text-left hover:border-indigo-300 hover:bg-indigo-50 transition-all"
+                      onClick={() => {
+                        setSelectedTemplate(template);
+                        generateReport();
+                      }}
+                      className="p-4 border border-gray-200 rounded-lg text-left hover:border-indigo-300 hover:bg-indigo-50 transition-all"
                       >
                         <div className="flex items-center space-x-2 mb-2">
                           <span className="text-lg">{template.icon}</span>

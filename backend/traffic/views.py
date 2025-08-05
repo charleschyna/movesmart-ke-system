@@ -642,7 +642,7 @@ class TrafficReportViewSet(viewsets.ViewSet):
             lat, lon = city_coords[city]
             
             # Calculate bounding box from city center and a 10km radius
-            radius_km = 10
+            radius_km = 20
             lat_change = radius_km / 111.32
             lon_change = radius_km / (111.32 * math.cos(math.radians(lat)))
             bbox = f"{lon - lon_change},{lat - lat_change},{lon + lon_change},{lat + lat_change}"

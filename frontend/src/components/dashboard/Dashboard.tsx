@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapIcon, 
   ChartBarIcon, 
-  BeakerIcon,
   ExclamationTriangleIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
@@ -15,9 +14,9 @@ import {
   HomeIcon,
   ChevronRightIcon,
   UserIcon,
-  GlobeAltIcon,
   ExclamationCircleIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  CloudIcon
 } from '@heroicons/react/24/outline';
 import { City, TrafficData, Incident } from '../../types';
 import { DEFAULT_CITY, STORAGE_KEYS, KENYA_CITIES } from '../../constants';
@@ -25,13 +24,10 @@ import apiService from '../../services/api';
 import { toast } from 'react-hot-toast';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import RouteOptimization from '../features/RouteOptimization';
+// import RouteOptimization from '../features/RouteOptimization'; // Moved to mobile app
 import PredictiveAnalytics from '../features/PredictiveAnalytics';
-import ScenarioSimulation from '../features/ScenarioSimulation';
 import ReportsExports from '../features/ReportsExports';
-import SustainabilityPanel from '../features/SustainabilityPanel';
-import UserProfile from '../features/UserProfile';
-import IncidentReporting from '../features/IncidentReporting';
+import IncidentManagement from '../features/IncidentManagement';
 import NotificationCenter from '../features/NotificationCenter';
 import Settings from '../features/Settings';
 import StatsCards from './StatsCards';
@@ -42,6 +38,9 @@ import DailyCongestionTrends from '../charts/DailyCongestionTrends';
 import AreaComparison from '../charts/AreaComparison';
 import RoadsAnalytics from '../features/RoadsAnalytics';
 import CongestionAnalytics from '../features/CongestionAnalytics';
+import WeatherPage from '../features/WeatherPage';
+import WeatherWidget from '../common/WeatherWidget';
+import TrafficSignalControl from '../features/TrafficSignalControl';
 
 const Dashboard: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
@@ -50,6 +49,8 @@ const Dashboard: React.FC = () => {
   const [activeNavItem, setActiveNavItem] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   const citySelectorRef = useRef<HTMLDivElement>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -103,11 +104,11 @@ const Dashboard: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.SELECTED_CITY, selectedCity.id);
   }, [selectedCity, fetchDashboardData]);
 
-  // Auto-refresh data every 30 seconds
+// Auto-refresh data every 3 minutes
   useEffect(() => {
     const interval = setInterval(() => {
       fetchDashboardData();
-    }, 30000); // 30 seconds
+    }, 180000); // 3 minutes
 
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
@@ -134,9 +135,15 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener('navigate-to-ai-reports', handleNavigateToAiReports);
   }, []);
 
-  // Initialize map only once
+  // Initialize map when dashboard is active
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || activeNavItem !== 'dashboard') return;
+
+    // Clean up existing map if it exists
+    if (map.current) {
+      map.current.remove();
+      map.current = null;
+    }
 
     // Get TomTom API key from environment variables
     const tomTomApiKey = import.meta.env.VITE_TOMTOM_API_KEY;
@@ -155,16 +162,14 @@ const Dashboard: React.FC = () => {
           tiles: [
             `https://api.tomtom.com/map/1/tile/basic/main/{z}/{x}/{y}.png?key=${tomTomApiKey}`
           ],
-          tileSize: 256,
-          attribution: '© TomTom'
+          tileSize: 256
         },
         'tomtom-traffic': {
           type: 'raster',
           tiles: [
             `https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${tomTomApiKey}`
           ],
-          tileSize: 256,
-          attribution: '© TomTom Traffic'
+          tileSize: 256
         }
       },
       layers: [
@@ -305,7 +310,7 @@ const Dashboard: React.FC = () => {
         map.current = null;
       }
     };
-  }, []);
+  }, [activeNavItem, selectedCity.coordinates]);
 
   // Update map center when city changes
   useEffect(() => {
@@ -372,19 +377,35 @@ const Dashboard: React.FC = () => {
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard Overview', icon: HomeIcon, active: true },
-    { id: 'routes', label: 'Route Optimization', icon: MapIcon, active: false },
-    { id: 'roadsAnalytics', label: 'Roads Analytics', icon: ChartBarIcon, active: false },
-    { id: 'congestionAnalytics', label: 'Congestion Analytics', icon: ClockIcon, active: false },
+    { id: 'trafficSignals', label: 'Traffic Signal Control', icon: MapIcon, active: false },
+    { 
+      id: 'analyticsGroup', 
+      label: 'Traffic Analytics', 
+      icon: ChartBarIcon, 
+      active: false,
+      hasDropdown: true,
+      subItems: [
+        { id: 'roadsAnalytics', label: 'Roads Analytics', icon: MapIcon },
+        { id: 'congestionAnalytics', label: 'Congestion Analytics', icon: ClockIcon }
+      ]
+    },
     { id: 'analytics', label: 'Predictive Analytics', icon: ChartBarIcon, active: false },
-    { id: 'reports', label: 'Reports & Exports', icon: DocumentTextIcon, active: false },
-    { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon, active: false },
-    { id: 'profile', label: 'User Profile', icon: UserIcon, active: false },
+    {
+      id: 'reportsGroup',
+      label: 'Reports & Insights',
+      icon: DocumentTextIcon,
+      active: false,
+      hasDropdown: true,
+      subItems: [
+        { id: 'aiReports', label: 'AI Traffic Reports', icon: LightBulbIcon },
+        { id: 'reports', label: 'Report Templates', icon: DocumentTextIcon }
+      ]
+    },
+    { id: 'weather', label: 'Weather Conditions', icon: CloudIcon, active: false },
     { id: 'liveIncidents', label: 'Live Incidents', icon: ExclamationTriangleIcon, active: false },
-    { id: 'incidents', label: 'Incident Reporting', icon: ExclamationCircleIcon, active: false },
+    { id: 'incidents', label: 'Incident Management', icon: ExclamationCircleIcon, active: false },
     { id: 'notifications', label: 'Notification Center', icon: BellIcon, active: false },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon, active: false },
-    { id: 'sustainability', label: 'Sustainability Panel', icon: GlobeAltIcon, active: false },
-    { id: 'simulation', label: 'Scenario Simulation', icon: BeakerIcon, active: false },
   ];
 
   // Get dynamic user data from localStorage or context
@@ -473,7 +494,7 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center space-x-3">
             <motion.div 
               whileHover={{ scale: 1.1, rotate: 5 }}
-              className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg"
+              className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg"
             >
               <MapPinIcon className="w-6 h-6 text-white" />
             </motion.div>
@@ -486,7 +507,7 @@ const Dashboard: React.FC = () => {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                   MoveSmart
                 </h1>
-                <p className="text-sm text-green-600 font-semibold tracking-wide">KENYA</p>
+                <p className="text-sm text-blue-600 font-semibold tracking-wide">KENYA</p>
               </motion.div>
             )}
           </div>
@@ -504,7 +525,11 @@ const Dashboard: React.FC = () => {
         <nav className="flex-1 p-4 overflow-y-auto">
           <div className="space-y-2">
             {navigationItems.map((item, index) => {
-              const isActive = activeNavItem === item.id;
+              const isActive = activeNavItem === item.id || 
+                (item.subItems && item.subItems.some(sub => sub.id === activeNavItem));
+              const isDropdownOpen = (item.id === 'analyticsGroup' && isAnalyticsOpen) || 
+                                    (item.id === 'reportsGroup' && isReportsOpen);
+              
               return (
                 <motion.div
                   key={item.id}
@@ -513,18 +538,28 @@ const Dashboard: React.FC = () => {
                   transition={{ delay: index * 0.1 }}
                 >
                   <button
-                    onClick={() => setActiveNavItem(item.id)}
-                    className={`w-full group flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all duration-200 relative overflow-hidden ${
+                    onClick={() => {
+                      if (item.hasDropdown) {
+                        if (item.id === 'analyticsGroup') {
+                          setIsAnalyticsOpen(!isAnalyticsOpen);
+                        } else if (item.id === 'reportsGroup') {
+                          setIsReportsOpen(!isReportsOpen);
+                        }
+                      } else {
+                        setActiveNavItem(item.id);
+                      }
+                    }}
+                    className={`w-full group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-200 relative overflow-hidden ${
                       isActive 
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg transform scale-[1.02]'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform scale-[1.02]'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
                     {/* Active indicator */}
-                    {isActive && (
+                    {isActive && !item.hasDropdown && (
                       <motion.div
                         layoutId="activeTab"
-                        className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl"
+                        className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl"
                         transition={{ type: "spring", duration: 0.6 }}
                       />
                     )}
@@ -538,16 +573,93 @@ const Dashboard: React.FC = () => {
                       )}
                     </div>
                     
+                    {/* Dropdown Arrow */}
+                    {item.hasDropdown && !isSidebarCollapsed && (
+                      <ChevronDownIcon 
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isDropdownOpen ? 'rotate-180' : ''
+                        } ${
+                          isActive ? 'text-white' : 'text-gray-500'
+                        }`}
+                      />
+                    )}
+                    
                     {/* Hover effect */}
                     {!isActive && (
                       <div className="absolute inset-0 bg-gray-50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     )}
                   </button>
+                  
+                  {/* Dropdown Items */}
+                  {item.hasDropdown && (
+                    <AnimatePresence>
+                      {isDropdownOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pl-6 mt-2 space-y-1">
+                            {item.subItems?.map((subItem) => {
+                              const isSubActive = activeNavItem === subItem.id;
+                              return (
+                                <button
+                                  key={subItem.id}
+                                  onClick={() => setActiveNavItem(subItem.id)}
+                                  className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
+                                    isSubActive
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  }`}
+                                >
+                                  <subItem.icon className={`w-4 h-4 ${
+                                    isSubActive ? 'text-blue-600' : 'text-gray-500'
+                                  }`} />
+                                  {!isSidebarCollapsed && (
+                                    <span className={`text-sm font-medium ${
+                                      isSubActive ? 'text-blue-700' : ''
+                                    }`}>
+                                      {subItem.label}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  )}
                 </motion.div>
               );
             })}
           </div>
         </nav>
+
+        {/* Simple Footer Section */}
+        <div className="p-3 border-t border-gray-100">
+          {!isSidebarCollapsed ? (
+            /* Expanded Footer - User Info */
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xs">{currentUser.initials}</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
+                <p className="text-xs text-gray-500">{currentUser.role}</p>
+              </div>
+            </div>
+          ) : (
+            /* Collapsed Footer - User Avatar */
+            <div className="flex justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xs">{currentUser.initials}</span>
+              </div>
+            </div>
+          )}
+        </div>
 
       </motion.div>
 
@@ -581,11 +693,11 @@ const Dashboard: React.FC = () => {
             >
               <button
                 onClick={() => setIsCitySelectorOpen(!isCitySelectorOpen)}
-                className="flex items-center space-x-2 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 hover:bg-green-100 transition-all duration-200 group"
+                className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-all duration-200 group"
               >
-                <MapPinIcon className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700">{selectedCity.name}</span>
-                <ChevronDownIcon className={`w-4 h-4 text-green-500 transition-transform duration-200 ${
+                <MapPinIcon className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">{selectedCity.name}</span>
+                <ChevronDownIcon className={`w-4 h-4 text-blue-500 transition-transform duration-200 ${
                   isCitySelectorOpen ? 'rotate-180' : ''
                 }`} />
               </button>
@@ -603,17 +715,17 @@ const Dashboard: React.FC = () => {
                         key={city.id}
                         onClick={() => handleCityChange(city)}
                         className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-gray-50 transition-colors ${
-                          selectedCity.id === city.id ? 'bg-green-50 text-green-700' : 'text-gray-700'
+                          selectedCity.id === city.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                         }`}
                       >
                         <MapPinIcon className={`w-4 h-4 ${
-                          selectedCity.id === city.id ? 'text-green-600' : 'text-gray-400'
+                          selectedCity.id === city.id ? 'text-blue-600' : 'text-gray-400'
                         }`} />
                         <div className="flex-1">
                           <p className="text-sm font-medium">{city.name}</p>
                         </div>
                         {selectedCity.id === city.id && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
                         )}
                       </button>
                     ))}
@@ -632,12 +744,18 @@ const Dashboard: React.FC = () => {
           >
             {/* Live Status */}
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
               <span className="text-sm text-gray-600 font-medium">Live Data Active</span>
             </div>
             
+            {/* Weather Widget */}
+            <WeatherWidget 
+              selectedCity={selectedCity}
+              onClick={() => setActiveNavItem('weather')}
+            />
+
             {/* Time */}
-            <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
+            <div className="hidden lg:flex items-center space-x-2 text-sm text-gray-600">
               <ClockIcon className="w-4 h-4" />
               <span className="font-medium">
                 {new Date().toLocaleTimeString('en-US', { 
@@ -656,7 +774,7 @@ const Dashboard: React.FC = () => {
 
             {/* User Profile - Simplified */}
             <div className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-1.5">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xs">{currentUser.initials}</span>
               </div>
               <div className="hidden sm:block">
@@ -700,7 +818,7 @@ const Dashboard: React.FC = () => {
                         </p>
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                             <span className="text-xs text-gray-600">Free flow</span>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -712,13 +830,9 @@ const Dashboard: React.FC = () => {
                             <span className="text-xs text-gray-600">Traffic jam</span>
                           </div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">Live traffic data from TomTom</p>
+                        <p className="text-xs text-gray-500 mt-2">Live traffic data</p>
                       </div>
 
-                      {/* Map Attribution */}
-                      <div className="absolute bottom-4 right-4 text-xs text-gray-500 z-10">
-                        © TomTom, © OpenStreetMap contributors
-                      </div>
                     </div>
                   </div>
 
@@ -750,9 +864,8 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           )}
-
-          {activeNavItem === 'routes' && (
-            <RouteOptimization />
+          {activeNavItem === 'trafficSignals' && (
+            <TrafficSignalControl />
           )}
 
           {activeNavItem === 'roadsAnalytics' && (
@@ -767,10 +880,6 @@ const Dashboard: React.FC = () => {
             <PredictiveAnalytics />
           )}
 
-          {activeNavItem === 'simulation' && (
-            <ScenarioSimulation />
-          )}
-
           {activeNavItem === 'reports' && (
             <ReportsExports />
           )}
@@ -779,20 +888,16 @@ const Dashboard: React.FC = () => {
             <AITrafficReports />
           )}
 
-          {activeNavItem === 'sustainability' && (
-            <SustainabilityPanel />
-          )}
-
-          {activeNavItem === 'profile' && (
-            <UserProfile />
-          )}
-
           {activeNavItem === 'liveIncidents' && (
             <IncidentsPage />
           )}
 
           {activeNavItem === 'incidents' && (
-            <IncidentReporting />
+            <IncidentManagement />
+          )}
+
+          {activeNavItem === 'weather' && (
+            <WeatherPage selectedCity={selectedCity} />
           )}
 
           {activeNavItem === 'notifications' && (

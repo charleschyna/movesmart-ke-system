@@ -45,10 +45,10 @@ export const API_ENDPOINTS = {
   
   // Incidents endpoints
   INCIDENTS: {
-    GET_ALL: '/api/incidents',
-    CREATE: '/api/incidents',
-    UPDATE: '/api/incidents/:id',
-    DELETE: '/api/incidents/:id',
+    GET_ALL: '/api/incidents/',
+    CREATE: '/api/incidents/',
+    UPDATE: '/api/incidents/:id/',
+    DELETE: '/api/incidents/:id/',
   },
   
   // Analytics endpoints

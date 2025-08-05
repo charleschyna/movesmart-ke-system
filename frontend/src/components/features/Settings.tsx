@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   Cog6ToothIcon,
   UserIcon,
@@ -99,6 +100,7 @@ interface SystemInfo {
 }
 
 const Settings: React.FC = () => {
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'privacy' | 'appearance' | 'data' | 'advanced' | 'about'>('general');
   const [settings, setSettings] = useState<UserSettings>({
     profile: {
@@ -129,7 +131,7 @@ const Settings: React.FC = () => {
       personalizedContent: true
     },
     appearance: {
-      theme: 'light',
+      theme: theme,
       colorScheme: 'green',
       compactMode: false,
       animations: true
@@ -162,6 +164,11 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const handleSettingChange = (section: keyof UserSettings, key: string, value: any) => {
+    // Special handling for theme changes
+    if (section === 'appearance' && key === 'theme') {
+      setTheme(value);
+    }
+    
     setSettings(prev => ({
       ...prev,
       [section]: {
@@ -675,7 +682,7 @@ const Settings: React.FC = () => {
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleSettingChange('appearance', 'theme', theme.value)}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      settings.appearance.theme === theme.value
+                      theme === theme.value
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}

@@ -49,8 +49,8 @@ interface IncidentFilters {
   status: string;
 }
 
-const IncidentReporting: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'report' | 'analytics'>('map');
+const IncidentManagement: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'pending' | 'verified' | 'all' | 'map' | 'analytics'>('pending');
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -263,19 +263,20 @@ const IncidentReporting: React.FC = () => {
               <ExclamationTriangleIcon className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Incident Reporting</h1>
-              <p className="text-gray-600">Report and track traffic incidents in real-time</p>
+              <h1 className="text-2xl font-bold text-gray-900">Incident Management Dashboard</h1>
+              <p className="text-gray-600">Review and manage traffic incidents reported by users</p>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowReportModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-lg font-medium hover:from-red-700 hover:to-orange-700 transition-all"
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span>Report Incident</span>
-          </motion.button>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium text-green-700">Live Dashboard</span>
+            </div>
+            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all">
+              <ArrowPathIcon className="w-4 h-4" />
+              <span className="text-sm">Refresh</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -818,4 +819,4 @@ const IncidentReporting: React.FC = () => {
   );
 };
 
-export default IncidentReporting;
+export default IncidentManagement;

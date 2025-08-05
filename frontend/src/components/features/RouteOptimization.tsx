@@ -216,7 +216,7 @@ Format your response as JSON with this structure:
         ],
         confidence: 78,
         reasoningSteps: [
-          'Analyzed current traffic patterns using TomTom data',
+          'Analyzed current traffic patterns using real-time data',
           'Compared route efficiency metrics',
           'Evaluated environmental and cost factors'
         ],
