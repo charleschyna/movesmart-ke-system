@@ -40,33 +40,9 @@ const CongestionAnalytics: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('all');
 
-  const generateInitialData = (): CongestionDataPoint[] => {
-    const dataPoints = [];
-    const now = new Date();
-    
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-      const hour = time.getHours();
-
-      let baseCongestion = 20;
-      if (hour >= 7 && hour <= 9) baseCongestion = 75;
-      else if (hour >= 17 && hour <= 19) baseCongestion = 80;
-      else if (hour >= 12 && hour <= 14) baseCongestion = 45;
-      else if (hour >= 22 || hour <= 6) baseCongestion = 15;
-
-      const congestion = Math.max(0, Math.min(100, baseCongestion + (Math.random() - 0.5) * 20));
-      const speed = Math.round(60 - (congestion * 0.4));
-      const incidents = Math.floor(Math.random() * 5) + (congestion > 60 ? 2 : 0);
-
-      dataPoints.push({
-        time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        congestion: Math.round(congestion),
-        speed,
-        incidents
-      });
-    }
-
-    return dataPoints;
+  // Initialize empty data array - will be populated from API
+  const initializeEmptyData = (): CongestionDataPoint[] => {
+    return [];
   };
 
   const fetchTrafficData = async () => {
@@ -97,12 +73,14 @@ const CongestionAnalytics: React.FC = () => {
   };
 
   useEffect(() => {
-    const initialData = generateInitialData();
-    setData(initialData);
-    setLoading(false);
+    // Initialize with empty data array
+    setData([]);
+    setLoading(true);
 
+    // Fetch real traffic data immediately
     fetchTrafficData();
 
+    // Set up interval for real-time updates
     const interval = setInterval(fetchTrafficData, 30000);
 
     return () => clearInterval(interval);

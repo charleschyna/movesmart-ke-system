@@ -164,10 +164,16 @@ export const CITY_ROADS = {
     { id: 'thika_road', name: 'Thika Road' },
     { id: 'ngong_road', name: 'Ngong Road' },
     { id: 'jogoo_road', name: 'Jogoo Road' },
-    { id: 'lang_ata_road', name: 'Lang\'ata Road' },
+    { id: 'langata_road', name: "Lang'ata Road" },
     { id: 'outer_ring_road', name: 'Outer Ring Road' },
     { id: 'enterprise_road', name: 'Enterprise Road' },
-    { id: 'kiambu_road', name: 'Kiambu Road' }
+    { id: 'kiambu_road', name: 'Kiambu Road' },
+    { id: 'limuru_road', name: 'Limuru Road' },
+    { id: 'haile_selassie_avenue', name: 'Haile Selassie Avenue' },
+    { id: 'ring_road_westlands', name: 'Ring Road Westlands' },
+    { id: 'james_gichuru_road', name: 'James Gichuru Road' },
+    { id: 'muthaiga_road', name: 'Muthaiga Road' },
+    { id: 'kenyatta_avenue', name: 'Kenyatta Avenue' }
   ],
   mombasa: [
     { id: 'all', name: 'All Roads' },
@@ -177,34 +183,58 @@ export const CITY_ROADS = {
     { id: 'nyali_bridge', name: 'Nyali Bridge' },
     { id: 'links_road', name: 'Links Road' },
     { id: 'malindi_road', name: 'Malindi Road' },
-    { id: 'airport_road', name: 'Airport Road' }
+    { id: 'airport_road', name: 'Airport Road' },
+    { id: 'makupa_causeway', name: 'Makupa Causeway' },
+    { id: 'kilindini_road', name: 'Kilindini Road' },
+    { id: 'likoni_road', name: 'Likoni Road' },
+    { id: 'port_reitz_road', name: 'Port Reitz Road' },
+    { id: 'jomo_kenyatta_avenue', name: 'Jomo Kenyatta Avenue' }
   ],
   kisumu: [
     { id: 'all', name: 'All Roads' },
     { id: 'kakamega_road', name: 'Kakamega Road' },
     { id: 'busia_road', name: 'Busia Road' },
-    { id: 'kondele_road', name: 'Kondele Road' },
+    { id: 'kondele_bypass', name: 'Kondele Bypass' },
     { id: 'oginga_odinga_street', name: 'Oginga Odinga Street' },
     { id: 'jomo_kenyatta_highway', name: 'Jomo Kenyatta Highway' },
-    { id: 'nairobi_road', name: 'Nairobi Road' }
+    { id: 'nairobi_road', name: 'Nairobi Road' },
+    { id: 'ring_road', name: 'Ring Road' },
+    { id: 'kisian_bus_stage_road', name: 'Kisian Road' }
   ],
   nakuru: [
     { id: 'all', name: 'All Roads' },
     { id: 'kenyatta_avenue', name: 'Kenyatta Avenue' },
-    { id: 'nairobi_nakuru_highway', name: 'Nairobi-Nakuru Highway' },
+    { id: 'nairobi_nakuru_highway', name: 'Nairobi–Nakuru Highway' },
     { id: 'eldoret_road', name: 'Eldoret Road' },
     { id: 'nyahururu_road', name: 'Nyahururu Road' },
     { id: 'gilgil_road', name: 'Gilgil Road' },
-    { id: 'london_road', name: 'London Road' }
+    { id: 'london_road', name: 'London Road' },
+    { id: 'nakuru_eldoret_highway', name: 'Nakuru–Eldoret Highway' },
+    { id: 'njoro_road', name: 'Njoro Road' }
   ],
   eldoret: [
     { id: 'all', name: 'All Roads' },
     { id: 'uganda_road', name: 'Uganda Road' },
-    { id: 'nakuru_eldoret_highway', name: 'Nakuru-Eldoret Highway' },
+    { id: 'nakuru_eldoret_highway', name: 'Nakuru–Eldoret Highway' },
     { id: 'kapsabet_road', name: 'Kapsabet Road' },
     { id: 'kitale_road', name: 'Kitale Road' },
     { id: 'iten_road', name: 'Iten Road' },
-    { id: 'west_road', name: 'West Road' }
+    { id: 'west_road', name: 'West Road' },
+    { id: 'kisumu_road', name: 'Kisumu Road' },
+    { id: 'ziwa_road', name: 'Ziwa Road' }
+  ],
+  kiambu: [
+    { id: 'all', name: 'All Roads' },
+    { id: 'kiambu_road', name: 'Kiambu Road' },
+    { id: 'ruiru_kamiti_road', name: 'Ruiru–Kamiti Road' },
+    { id: 'kiambu_ruiru_road', name: 'Kiambu–Ruiru Road' },
+    { id: 'kirigiti_ndumberi_road', name: 'Kirigiti–Ndumberi Road' },
+    { id: 'githunguri_road', name: 'Githunguri Road' },
+    { id: 'kiambu_githunguri_road', name: 'Kiambu–Githunguri Road' },
+    { id: 'kabete_road', name: 'Kabete Road' },
+    { id: 'banana_ruiru_road', name: 'Banana–Ruiru Road' },
+    { id: 'limuru_road', name: 'Limuru Road (Kiambu Section)' },
+    { id: 'kamiti_road', name: 'Kamiti Road' }
   ]
 } as const;
 
@@ -243,6 +273,13 @@ export const KENYA_CITIES = [
     name: 'Eldoret',
     coordinates: [35.2698, 0.5143] as [number, number],
     center: [35.2698, 0.5143] as [number, number],
+    zoom: 12
+  },
+  {
+    id: 'kiambu',
+    name: 'Kiambu',
+    coordinates: [36.8356, -1.1714] as [number, number],
+    center: [36.8356, -1.1714] as [number, number],
     zoom: 12
   }
 ] as const;

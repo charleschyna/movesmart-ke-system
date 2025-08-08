@@ -23,14 +23,9 @@ const AreaComparison: React.FC<AreaComparisonProps> = ({
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const generateInitialData = () => {
-    return [
-      { area: 'Uhuru Highway', congestion: Math.floor(Math.random() * 100) },
-      { area: 'Waiyaki Way', congestion: Math.floor(Math.random() * 100) },
-      { area: 'Mombasa Road', congestion: Math.floor(Math.random() * 100) },
-      { area: 'Thika Road', congestion: Math.floor(Math.random() * 100) },
-      { area: 'Ngong Road', congestion: Math.floor(Math.random() * 100) }
-    ];
+  // Initialize with empty data - will be populated from API
+  const initializeEmptyData = () => {
+    return [];
   };
 
   const fetchAreaData = async () => {
@@ -59,10 +54,10 @@ const AreaComparison: React.FC<AreaComparisonProps> = ({
 
   useEffect(() => {
     setLoading(true);
-    const initialData = generateInitialData();
-    setData(initialData);
-    setLoading(false);
+    // Initialize with empty data
+    setData([]);
     
+    // Fetch real data immediately
     fetchAreaData();
     
     const interval = setInterval(fetchAreaData, refreshInterval);

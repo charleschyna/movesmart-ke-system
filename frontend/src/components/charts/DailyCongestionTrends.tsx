@@ -26,36 +26,9 @@ const DailyCongestionTrends: React.FC<DailyCongestionTrendsProps> = ({
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  // Generate mock data points for the last 24 hours (hourly intervals)
-  const generateInitialData = (): CongestionDataPoint[] => {
-    const dataPoints = [];
-    const now = new Date();
-    
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-      const hour = time.getHours();
-      
-      // Simulate realistic traffic patterns
-      let baseCongestion = 20;
-      if (hour >= 7 && hour <= 9) baseCongestion = 75; // Morning rush
-      else if (hour >= 17 && hour <= 19) baseCongestion = 80; // Evening rush
-      else if (hour >= 12 && hour <= 14) baseCongestion = 45; // Lunch time
-      else if (hour >= 22 || hour <= 6) baseCongestion = 15; // Night time
-      
-      // Add some randomness
-      const congestion = Math.max(0, Math.min(100, baseCongestion + (Math.random() - 0.5) * 20));
-      const speed = Math.round(60 - (congestion * 0.4)); // Speed inversely related to congestion
-      const incidents = Math.floor(Math.random() * 5) + (congestion > 60 ? 2 : 0);
-      
-      dataPoints.push({
-        time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        congestion: Math.round(congestion),
-        speed,
-        incidents
-      });
-    }
-    
-    return dataPoints;
+  // Initialize empty data array - will be populated from API
+  const initializeEmptyData = (): CongestionDataPoint[] => {
+    return [];
   };
 
   // Fetch real-time traffic data
@@ -87,11 +60,11 @@ const DailyCongestionTrends: React.FC<DailyCongestionTrendsProps> = ({
     }
   };
 
-  // Initialize with mock data and start real-time updates
+  // Initialize and start real-time updates
   useEffect(() => {
-    const initialData = generateInitialData();
-    setData(initialData);
-    setLoading(false);
+    // Initialize with empty data
+    setData([]);
+    setLoading(true);
     
     // Fetch real data immediately
     fetchTrafficData();
