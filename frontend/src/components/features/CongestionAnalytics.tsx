@@ -17,7 +17,7 @@ import {
   CubeTransparentIcon,
   MapIcon
 } from '@heroicons/react/24/outline';
-import { KENYA_CITIES } from '../../constants';
+import { KENYA_CITIES, CITY_ROADS } from '../../constants';
 import apiService from '../../services/api';
 
 interface CongestionDataPoint {
@@ -32,13 +32,25 @@ type TimeRange = '24h' | '7d' | '30d';
 type MetricType = 'congestion' | 'speed' | 'incidents' | 'all';
 
 const CongestionAnalytics: React.FC = () => {
+  // Primary (A) selection state
   const [data, setData] = useState<CongestionDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [selectedCity, setSelectedCity] = useState(KENYA_CITIES[0]);
+  const [selectedRoadId, setSelectedRoadId] = useState<string>('all');
   const [chartType, setChartType] = useState<ChartType>('line');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('all');
+
+  // Comparison (B) selection state
+  const [compareEnabled, setCompareEnabled] = useState<boolean>(false);
+  const [selectedCityB, setSelectedCityB] = useState(KENYA_CITIES[1] || KENYA_CITIES[0]);
+  const [selectedRoadIdB, setSelectedRoadIdB] = useState<string>('all');
+  const [dataB, setDataB] = useState<CongestionDataPoint[]>([]);
+  const [lastUpdateB, setLastUpdateB] = useState<Date>(new Date());
+  const [loadingB, setLoadingB] = useState<boolean>(false);
+  const [compareMode, setCompareMode] = useState<'same' | 'small'>('small');
+
   // Live KPI snapshot from summary endpoint (used for top cards)
   const [kpi, setKpi] = useState({ avgCongestion: 0, avgSpeed: 0, totalIncidents: 0 });
 
@@ -81,8 +93,14 @@ const CongestionAnalytics: React.FC = () => {
     });
   };
 
+  // Fetch historical trends for a selection when road is 'all' (city aggregate)
   const fetchTrends = async () => {
     try {
+      if (selectedRoadId !== 'all') {
+        // For specific road, no historical API available; rely on live polling
+        setData([]);
+        return;
+      }
       const resp = await apiService.getCongestionTrends(selectedCity.id, timeRange);
       if (resp?.success && resp.data) {
         const series = transformTrends(resp.data, timeRange);
@@ -98,54 +116,118 @@ const CongestionAnalytics: React.FC = () => {
   };
 
   // Fetch a single snapshot and append to series (realtime)
-  const fetchTrafficData = async () => {
+  // Live snapshot fetcher for selection A (city or specific road)
+  const fetchLiveA = async () => {
     try {
-      const response = await apiService.getTrafficData(selectedCity.id);
+      const now = new Date();
+      let newDataPoint: CongestionDataPoint | null = null;
+      if (selectedRoadId === 'all') {
+        const response = await apiService.getTrafficData(selectedCity.id);
+        if (response.success && response.data) {
+          newDataPoint = {
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            congestion: response.data.congestionLevel || 0,
+            speed: Math.round(60 - (response.data.congestionLevel * 0.4)) || 50,
+            incidents: response.data.liveIncidents || 0
+          };
+        }
+      } else {
+        const res = await apiService.getRoadMetrics(selectedCity.id, selectedRoadId);
+        if (res?.success && res.data) {
+          newDataPoint = {
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            congestion: Number(res.data.congestion ?? res.data.congestionLevel ?? 0),
+            speed: Number(res.data.avgSpeed ?? res.data.speed ?? 0),
+            incidents: Number(res.data.incidents ?? res.data.liveIncidents ?? 0),
+          };
+        }
+      }
 
-      if (response.success && response.data) {
-        const now = new Date();
-        const newDataPoint: CongestionDataPoint = {
-          time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          congestion: response.data.congestionLevel || 0,
-          speed: Math.round(60 - (response.data.congestionLevel * 0.4)) || 50,
-          incidents: response.data.liveIncidents || 0
-        };
-
+      if (newDataPoint) {
         setData(prevData => {
-          const updatedData = [...prevData, newDataPoint];
+          const updatedData = [...prevData, newDataPoint as CongestionDataPoint];
           return updatedData.slice(-maxPointsByRange[timeRange]);
         });
-
-        // Update KPI snapshot from summary endpoint
+        // Update KPI snapshot from latest point
         setKpi({
           avgCongestion: newDataPoint.congestion,
           avgSpeed: newDataPoint.speed,
           totalIncidents: newDataPoint.incidents,
         });
-
         setLastUpdate(now);
       }
     } catch (error) {
-      console.error('Failed to fetch traffic data for trends:', error);
+      console.error('Failed to fetch live data (A):', error);
     }
   };
-useEffect(() => {
-    // Immediately fetch a live snapshot so UI shows data without waiting for trends
+
+  // Live snapshot fetcher for selection B (only when compare enabled)
+  const fetchLiveB = async () => {
+    if (!compareEnabled) return;
+    try {
+      const now = new Date();
+      let newDataPoint: CongestionDataPoint | null = null;
+      if (selectedRoadIdB === 'all') {
+        const response = await apiService.getTrafficData(selectedCityB.id);
+        if (response.success && response.data) {
+          newDataPoint = {
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            congestion: response.data.congestionLevel || 0,
+            speed: Math.round(60 - (response.data.congestionLevel * 0.4)) || 50,
+            incidents: response.data.liveIncidents || 0
+          };
+        }
+      } else {
+        const res = await apiService.getRoadMetrics(selectedCityB.id, selectedRoadIdB);
+        if (res?.success && res.data) {
+          newDataPoint = {
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            congestion: Number(res.data.congestion ?? res.data.congestionLevel ?? 0),
+            speed: Number(res.data.avgSpeed ?? res.data.speed ?? 0),
+            incidents: Number(res.data.incidents ?? res.data.liveIncidents ?? 0),
+          };
+        }
+      }
+
+      if (newDataPoint) {
+        setDataB(prevData => {
+          const updatedData = [...prevData, newDataPoint as CongestionDataPoint];
+          return updatedData.slice(-maxPointsByRange[timeRange]);
+        });
+        setLastUpdateB(now);
+      }
+    } catch (error) {
+      console.error('Failed to fetch live data (B):', error);
+    }
+  };
+
+  // Effects: initialize and poll for A and B
+  useEffect(() => {
     setLoading(true);
-    fetchTrafficData().finally(() => setLoading(false));
-    // Fetch historical trends in parallel (does not block rendering)
-    fetchTrends();
-    // Start realtime appends every 30s (configurable later)
-    const interval = setInterval(fetchTrafficData, 30000);
-    return () => clearInterval(interval);
-  }, [selectedCity.id, timeRange]);
+    // Historical trends only for city aggregate
+    fetchTrends().finally(() => setLoading(false));
+    // Start realtime appends every 30s
+    fetchLiveA();
+    const intervalA = setInterval(fetchLiveA, 30000);
+    return () => clearInterval(intervalA);
+  }, [selectedCity.id, selectedRoadId, timeRange]);
+
+  useEffect(() => {
+    if (!compareEnabled) return;
+    setLoadingB(true);
+    // No historical fetch for B; we build forward using live
+    setDataB([]);
+    fetchLiveB().finally(() => setLoadingB(false));
+    const intervalB = setInterval(fetchLiveB, 30000);
+    return () => clearInterval(intervalB);
+  }, [compareEnabled, selectedCityB.id, selectedRoadIdB, timeRange]);
 
   // History-based stats for insights (from analytics series)
-  const totalIncidentsHistorical = data.reduce((sum, point) => sum + point.incidents, 0);
   const avgCongestionHistorical = data.length > 0 ? data.reduce((sum, point) => sum + point.congestion, 0) / data.length : 0;
   const avgSpeedHistorical = data.length > 0 ? data.reduce((sum, point) => sum + point.speed, 0) / data.length : 0;
   const peakCongestion = data.length > 0 ? Math.max(...data.map(d => d.congestion)) : 0;
   const minSpeed = data.length > 0 ? Math.min(...data.map(d => d.speed)) : 0;
+  const currentIncidents = data.length > 0 ? data[data.length - 1].incidents : kpi.totalIncidents;
 
   // Choose KPI display: prefer history for selected range if available
   const hasSeries = data.length > 0;
@@ -153,10 +235,9 @@ useEffect(() => {
     ? {
         avgCongestion: avgCongestionHistorical,
         avgSpeed: avgSpeedHistorical,
-        totalIncidents: totalIncidentsHistorical,
+        totalIncidents: currentIncidents,
       }
     : kpi;
-
   const getChartIcon = (type: ChartType) => {
     switch (type) {
       case 'bar': return ChartBarIcon;
@@ -164,6 +245,117 @@ useEffect(() => {
       case 'area': return CubeTransparentIcon;
       case 'pie': return ChartPieIcon;
     }
+  };
+
+  const getRoadName = (cityId: string, roadId: string) => {
+    const list = (CITY_ROADS[cityId as keyof typeof CITY_ROADS] as any[]) || [];
+    const it = list.find(r => r.id === roadId);
+    return it?.name || 'All Roads';
+  };
+
+  const selectionLabelA = `${selectedCity.name} - ${getRoadName(selectedCity.id, selectedRoadId)}`;
+  const selectionLabelB = `${selectedCityB.name} - ${getRoadName(selectedCityB.id, selectedRoadIdB)}`;
+
+  // Simple analytics helpers for dynamic insights
+  const safeNumber = (n: any, fallback = 0) => (Number.isFinite(Number(n)) ? Number(n) : fallback);
+  const lastN = <T,>(arr: T[], n: number): T[] => arr.slice(Math.max(0, arr.length - n));
+  const avg = (nums: number[]) => (nums.length ? nums.reduce((s, v) => s + v, 0) / nums.length : 0);
+  const stdDev = (nums: number[]) => {
+    if (!nums.length) return 0;
+    const m = avg(nums);
+    const v = avg(nums.map(x => (x - m) * (x - m)));
+    return Math.sqrt(v);
+  };
+  const slope = (ys: number[]) => {
+    const n = ys.length;
+    if (n < 2) return 0;
+    const xs = Array.from({ length: n }, (_, i) => i + 1);
+    const xMean = avg(xs);
+    const yMean = avg(ys);
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (xs[i] - xMean) * (ys[i] - yMean);
+      den += (xs[i] - xMean) * (xs[i] - xMean);
+    }
+    return den ? num / den : 0;
+  };
+  const pearson = (a: number[], b: number[]) => {
+    const n = Math.min(a.length, b.length);
+    if (n < 2) return 0;
+    const aa = a.slice(-n), bb = b.slice(-n);
+    const ma = avg(aa), mb = avg(bb);
+    let num = 0, da = 0, db = 0;
+    for (let i = 0; i < n; i++) {
+      const va = aa[i] - ma, vb = bb[i] - mb;
+      num += va * vb; da += va * va; db += vb * vb;
+    }
+    const den = Math.sqrt(da * db);
+    return den ? num / den : 0;
+  };
+
+  const insights = React.useMemo(() => {
+    const series = data;
+    if (!series || !series.length) {
+      return {
+        rushHourText: 'Insufficient data to determine rush hour right now.',
+        speedText: 'Awaiting live samples to assess speeds.',
+        incidentText: 'No live incident information available yet.',
+        recs: ['Keep monitoring for updates.']
+      };
+    }
+    const latest = series[series.length - 1];
+    const congestionArr = series.map(p => safeNumber(p.congestion));
+    const speedArr = series.map(p => safeNumber(p.speed));
+    const incidentArr = series.map(p => safeNumber(p.incidents));
+    const timeArr = series.map(p => p.time);
+
+    const recentWindow = Math.min(24, series.length);
+    const recentCong = lastN(congestionArr, recentWindow);
+    const recentSpeed = lastN(speedArr, recentWindow);
+
+    const congSlope = slope(recentCong);
+    const speedSlope = slope(recentSpeed);
+    const congVol = stdDev(recentCong);
+    const speedVol = stdDev(recentSpeed);
+
+    const maxCong = Math.max(...congestionArr);
+    const maxIdx = congestionArr.indexOf(maxCong);
+    const peakTime = maxIdx >= 0 ? timeArr[maxIdx] : '—';
+
+    const corrIncidents = pearson(congestionArr, incidentArr);
+
+    const rushHourText = `Peak congestion observed around ${peakTime} with ${Math.round(maxCong)}%. ${congSlope > 0 ? 'Trend is rising' : congSlope < 0 ? 'Trend is easing' : 'Trend is steady'} over the last ${recentWindow} samples (volatility ±${Math.round(congVol)}).`;
+    const speedText = `Current avg speed ~${Math.round(latest.speed)} km/h. ${speedSlope < 0 ? 'Speeds decreasing' : speedSlope > 0 ? 'Speeds improving' : 'Speeds steady'} recently (variability ±${Math.round(speedVol)}).`;
+    const incidentText = `Active incidents: ${safeNumber(latest.incidents)}. ${Math.abs(corrIncidents) >= 0.4 ? `Incidents ${corrIncidents > 0 ? 'positively' : 'negatively'} correlate with congestion` : 'Weak correlation with congestion'} in this window.`;
+
+    const recs: string[] = [];
+    if (latest.congestion >= 70) recs.push('Delay departure or choose alternative routes immediately.');
+    if (latest.speed <= 25) recs.push('Expect significant delays; consider non-road options if available.');
+    if (latest.incidents > 0) recs.push('Avoid affected corridors; incidents are impacting flow.');
+    if (!recs.length) recs.push('Conditions are manageable; maintain usual routes and speeds.');
+
+    return { rushHourText, speedText, incidentText, recs };
+  }, [data, selectedCity.id, selectedRoadId, timeRange]);
+
+  // Build aligned dataset for same-chart comparison by time label
+  const buildAlignedForSameChart = () => {
+    const mapA = new Map<string, CongestionDataPoint>();
+    data.forEach(p => mapA.set(p.time, p));
+    const keys = new Set<string>([...data.map(d => d.time), ...dataB.map(d => d.time)]);
+    const rows = Array.from(keys).sort();
+    return rows.map(t => {
+      const a = mapA.get(t);
+      const b = dataB.find(p => p.time === t);
+      return {
+        time: t,
+        a_congestion: a?.congestion ?? null,
+        a_speed: a?.speed ?? null,
+        a_incidents: a?.incidents ?? null,
+        b_congestion: b?.congestion ?? null,
+        b_speed: b?.speed ?? null,
+        b_incidents: b?.incidents ?? null,
+      } as any;
+    });
   };
 
   const renderChart = () => {
@@ -190,6 +382,35 @@ useEffect(() => {
 
     switch (chartType) {
       case 'line':
+        if (compareEnabled && compareMode === 'same') {
+          const aligned = buildAlignedForSameChart();
+          return (
+            <LineChart data={aligned} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="time" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              {(selectedMetric === 'all' || selectedMetric === 'congestion') && (
+                <>
+                  <Line type="monotone" dataKey="a_congestion" name="A Congestion" stroke="#ef4444" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="b_congestion" name="B Congestion" stroke="#ef4444" strokeDasharray="5 3" strokeWidth={2} dot={false} />
+                </>
+              )}
+              {(selectedMetric === 'all' || selectedMetric === 'speed') && (
+                <>
+                  <Line type="monotone" dataKey="a_speed" name="A Speed" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="b_speed" name="B Speed" stroke="#3b82f6" strokeDasharray="5 3" strokeWidth={2} dot={false} />
+                </>
+              )}
+              {(selectedMetric === 'all' || selectedMetric === 'incidents') && (
+                <>
+                  <Line type="monotone" dataKey="a_incidents" name="A Incidents" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="b_incidents" name="B Incidents" stroke="#f59e0b" strokeDasharray="5 3" strokeWidth={2} dot={false} />
+                </>
+              )}
+            </LineChart>
+          );
+        }
         return (
           <LineChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -358,11 +579,28 @@ useEffect(() => {
               <div className="relative">
                 <select
                   value={selectedCity.id}
-                  onChange={(e) => setSelectedCity(KENYA_CITIES.find(c => c.id === e.target.value) || KENYA_CITIES[0])}
+                  onChange={(e) => {
+                    const city = KENYA_CITIES.find(c => c.id === e.target.value) || KENYA_CITIES[0];
+                    setSelectedCity(city);
+                    setSelectedRoadId('all');
+                  }}
                   className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 >
                   {KENYA_CITIES.map(city => (
                     <option key={city.id} value={city.id}>{city.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Road Selector */}
+              <div className="relative">
+                <select
+                  value={selectedRoadId}
+                  onChange={(e) => setSelectedRoadId(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                >
+                  {(CITY_ROADS[selectedCity.id as keyof typeof CITY_ROADS] || []).map((road: any) => (
+                    <option key={road.id} value={road.id}>{road.name}</option>
                   ))}
                 </select>
               </div>
@@ -393,6 +631,25 @@ useEffect(() => {
                   <option value="incidents">Incidents Only</option>
                 </select>
               </div>
+
+              {/* Compare Toggle */}
+              <div className="flex items-center space-x-2">
+                <input id="compareToggle" type="checkbox" className="h-4 w-4 text-red-600" checked={compareEnabled} onChange={(e) => setCompareEnabled(e.target.checked)} />
+                <label htmlFor="compareToggle" className="text-sm text-gray-700">Compare</label>
+              </div>
+
+              {compareEnabled && (
+                <div className="relative">
+                  <select
+                    value={compareMode}
+                    onChange={(e) => setCompareMode(e.target.value as 'same' | 'small')}
+                    className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  >
+                    <option value="same">Same Chart</option>
+                    <option value="small">Small Multiples</option>
+                  </select>
+                </div>
+              )}
 
               {/* Live Status */}
               <div className="flex items-center space-x-2">
@@ -449,7 +706,7 @@ useEffect(() => {
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Incidents</p>
+                <p className="text-sm font-medium text-gray-600">Active Incidents</p>
                 <p className="text-2xl font-bold text-gray-900">{displayKPI.totalIncidents}</p>
               </div>
               <MapIcon className={`w-8 h-8 ${displayKPI.totalIncidents > 10 ? 'text-red-500' : 'text-green-500'}`} />
@@ -468,7 +725,7 @@ useEffect(() => {
             {/* Chart Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-0">
-                {selectedCity.name} Traffic Trends - {timeRange.toUpperCase()}
+                {selectedCity.name} {selectedRoadId !== 'all' ? `- ${(CITY_ROADS[selectedCity.id as keyof typeof CITY_ROADS] || []).find((r: any) => r.id === selectedRoadId)?.name || ''}` : 'Traffic Trends'} - {timeRange.toUpperCase()}
               </h2>
               
               <div className="flex items-center space-x-2">
@@ -501,10 +758,85 @@ useEffect(() => {
                 </div>
               </div>
             ) : (
-              <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
-                  {renderChart()}
-                </ResponsiveContainer>
+              <div className="space-y-6">
+                <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {renderChart()}
+                  </ResponsiveContainer>
+                </div>
+
+                {compareEnabled && compareMode === 'small' && (
+                  <div className="border-t border-gray-200 pt-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                      <h3 className="text-md font-semibold text-gray-900">Comparison</h3>
+                      <div className="flex flex-wrap items-center space-x-4">
+                        {/* City B Selector */}
+                        <div className="relative">
+                          <select
+                            value={selectedCityB.id}
+                            onChange={(e) => {
+                              const city = KENYA_CITIES.find(c => c.id === e.target.value) || KENYA_CITIES[0];
+                              setSelectedCityB(city);
+                              setSelectedRoadIdB('all');
+                            }}
+                            className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                          >
+                            {KENYA_CITIES.map(city => (
+                              <option key={city.id} value={city.id}>{city.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Road B Selector */}
+                        <div className="relative">
+                          <select
+                            value={selectedRoadIdB}
+                            onChange={(e) => setSelectedRoadIdB(e.target.value)}
+                            className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                          >
+                            {(CITY_ROADS[selectedCityB.id as keyof typeof CITY_ROADS] || []).map((road: any) => (
+                              <option key={road.id} value={road.id}>{road.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Secondary chart (small multiple) */}
+                    <div className="h-80">
+                      {loadingB ? (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          {/* Reuse chart renderer by temporarily swapping data */}
+                          {(() => {
+                            const original = data;
+                            // Temporarily render with dataB
+                            const temp = dataB;
+                            return (
+                              <LineChart data={temp} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="time" tick={{ fontSize: 12 }} angle={-45} textAnchor="end" height={80} />
+                                <YAxis tick={{ fontSize: 12 }} />
+                                <Tooltip />
+                                {(selectedMetric === 'all' || selectedMetric === 'congestion') && (
+                                  <Line type="monotone" dataKey="congestion" stroke="#ef4444" strokeWidth={3} dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                                )}
+                                {(selectedMetric === 'all' || selectedMetric === 'speed') && (
+                                  <Line type="monotone" dataKey="speed" stroke="#3b82f6" strokeWidth={3} dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                                )}
+                                {(selectedMetric === 'all' || selectedMetric === 'incidents') && (
+                                  <Line type="monotone" dataKey="incidents" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                                )}
+                              </LineChart>
+                            );
+                          })()}
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -529,6 +861,23 @@ useEffect(() => {
                 </div>
               )}
             </div>
+            {compareEnabled && compareMode === 'same' && (
+              <div className="mt-3 flex items-center justify-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <div style={{ width: 28, borderTop: '3px solid #4b5563' }} />
+                  <span className="text-sm text-gray-700">A: {selectionLabelA}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div style={{ width: 28, borderTop: '3px dashed #4b5563' }} />
+                  <span className="text-sm text-gray-700">B: {selectionLabelB}</span>
+                </div>
+              </div>
+            )}
+            {selectedRoadId !== 'all' && (
+              <div className="mt-2 text-center text-xs text-gray-500">
+                Live per-road overlay using real-time metrics. Historical backfill is unavailable; the series builds forward from now.
+              </div>
+            )}
           </motion.div>
 
           {/* Insights Panel */}
@@ -542,32 +891,24 @@ useEffect(() => {
             
             <div className="space-y-4">
               <div className="p-4 bg-red-50 rounded-lg">
-                <h4 className="font-medium text-red-900 mb-2">Rush Hour Analysis</h4>
-                <p className="text-sm text-red-700">
-                  Peak congestion occurs between 7-9 AM and 5-7 PM with average levels of {peakCongestion.toFixed(0)}%
-                </p>
+                <h4 className="font-medium text-red-900 mb-2">Rush Hour Analysis (Live)</h4>
+                <p className="text-sm text-red-700">{insights.rushHourText}</p>
               </div>
               
               <div className="p-4 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">Speed Analysis</h4>
-                <p className="text-sm text-blue-700">
-                  Average speed is {avgSpeedHistorical.toFixed(0)} km/h. Minimum speed recorded: {minSpeed} km/h
-                </p>
+                <h4 className="font-medium text-blue-900 mb-2">Speed Analysis (Live)</h4>
+                <p className="text-sm text-blue-700">{insights.speedText}</p>
               </div>
               
               <div className="p-4 bg-yellow-50 rounded-lg">
-                <h4 className="font-medium text-yellow-900 mb-2">Incident Pattern</h4>
-                <p className="text-sm text-yellow-700">
-                  {totalIncidentsHistorical} incidents recorded in the selected range. Higher incident rates correlate with peak traffic times.
-                </p>
+                <h4 className="font-medium text-yellow-900 mb-2">Incident Pattern (Live)</h4>
+                <p className="text-sm text-yellow-700">{insights.incidentText}</p>
               </div>
 
               <div className="p-4 bg-green-50 rounded-lg">
-                <h4 className="font-medium text-green-900 mb-2">Recommendations</h4>
+                <h4 className="font-medium text-green-900 mb-2">AI Recommendations</h4>
                 <div className="text-sm text-green-700 space-y-1">
-                  <p>• Avoid travel during 7-9 AM and 5-7 PM</p>
-                  <p>• Consider alternative routes during peak hours</p>
-                  <p>• Monitor live updates for incidents</p>
+                  {insights.recs.map((r, i) => <p key={i}>• {r}</p>)}
                 </div>
               </div>
             </div>
