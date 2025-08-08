@@ -1,46 +1,62 @@
-# Getting Started with Create React App
+# MoveSmart KE Frontend (Vite + React + TypeScript)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is the frontend for MoveSmart KE, a Kenya-focused urban traffic intelligence app. It uses Vite, React, TypeScript, Tailwind, MapLibre, and TomTom APIs.
 
-## Available Scripts
+## Quick Start
 
-In the project directory, you can run:
+1) Install
 
-### `npm start`
+```
+npm install
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+2) Configure environment
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Copy `.env.example` to `.env` and fill your values:
 
-### `npm test`
+```
+VITE_TOMTOM_API_KEY=your_tomtom_api_key_here
+# Optional if you call backend directly instead of proxy
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+3) Run the dev server (port 3000)
 
-### `npm run build`
+```
+npm run dev
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Vite is configured to open the browser automatically.
+- API requests to `/api/*` are proxied to `http://localhost:8000` (see `vite.config.js`).
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+4) Build for production
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```
+npm run build
+```
 
-### `npm run eject`
+5) Preview production build
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```
+npm run preview
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Key Features
+- Roads Analytics: live metrics per major road (congestion, speed, travel time, incidents). Uses TomTom Traffic Flow API with graceful fallback.
+- Dynamic City Support: Nairobi, Mombasa, Kisumu, Nakuru, Eldoret, and Kiambu with curated road lists.
+- Map Integration: MapLibre GL with TomTom raster base and traffic overlays on the Dashboard.
+- Authentication: Context-based auth flows and API client integration.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Environment Variables
+See `.env.example` for the full list. The most important is:
+- `VITE_TOMTOM_API_KEY` – required for live TomTom traffic, routing, and geocoding.
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Notes
+- In development, `API_BASE_URL` defaults to empty and `/api/*` requests are proxied to `http://localhost:8000` (configure in `vite.config.js`).
+- Some features provide simulated data when backend or TomTom API is not available.
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Testing
+```
+npm test
+```
+Runs Vitest with jsdom.

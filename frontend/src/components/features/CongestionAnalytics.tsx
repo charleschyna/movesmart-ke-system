@@ -39,12 +39,65 @@ const CongestionAnalytics: React.FC = () => {
   const [chartType, setChartType] = useState<ChartType>('line');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('all');
+  // Live KPI snapshot from summary endpoint (used for top cards)
+  const [kpi, setKpi] = useState({ avgCongestion: 0, avgSpeed: 0, totalIncidents: 0 });
+
+  // Determine max points to retain based on timeRange (approx 15-min buckets)
+  const maxPointsByRange: Record<TimeRange, number> = {
+    '24h': 96,   // 4 per hour
+    '7d': 672,   // 96 * 7
+    '30d': 2880, // 96 * 30
+  };
 
   // Initialize empty data array - will be populated from API
   const initializeEmptyData = (): CongestionDataPoint[] => {
     return [];
   };
 
+  // Transform trends API payload into CongestionDataPoint[]
+  const transformTrends = (raw: any, range: TimeRange): CongestionDataPoint[] => {
+    if (!raw) return [];
+    const arr: any[] = Array.isArray(raw) ? raw : (raw.points || raw.data || []);
+    const formatLabel = (dt: Date) => {
+      if (range === '24h') return dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      if (range === '7d') return dt.toLocaleDateString('en-GB', { weekday: 'short', hour: '2-digit' });
+      return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    };
+
+    return arr.map((it) => {
+      // Try to extract a timestamp
+      const ts = it.timestamp || it.time || it.datetime || it.date || it.hour;
+      const dt = ts ? new Date(ts) : new Date();
+      const label = typeof ts === 'string' || typeof ts === 'number' ? formatLabel(dt) : (it.label || formatLabel(dt));
+      // Try to extract metrics with common names
+      const congestion = Number(
+        it.congestion ?? it.congestionLevel ?? it.value ?? it.avgCongestion ?? 0
+      );
+      const speed = Number(
+        it.speed ?? it.avgSpeed ?? (congestion ? Math.round(60 - congestion * 0.4) : 0)
+      );
+      const incidents = Number(it.incidents ?? it.incidentCount ?? 0);
+      return { time: label, congestion, speed, incidents } as CongestionDataPoint;
+    });
+  };
+
+  const fetchTrends = async () => {
+    try {
+      const resp = await apiService.getCongestionTrends(selectedCity.id, timeRange);
+      if (resp?.success && resp.data) {
+        const series = transformTrends(resp.data, timeRange);
+        const capped = series.slice(-maxPointsByRange[timeRange]);
+        setData(capped);
+        setLastUpdate(new Date());
+      }
+    } catch (e) {
+      console.warn('Failed to fetch congestion trends, falling back to snapshots:', (e as any)?.message || e);
+      // Fallback to empty, realtime appends will fill
+      setData([]);
+    }
+  };
+
+  // Fetch a single snapshot and append to series (realtime)
   const fetchTrafficData = async () => {
     try {
       const response = await apiService.getTrafficData(selectedCity.id);
@@ -60,37 +113,49 @@ const CongestionAnalytics: React.FC = () => {
 
         setData(prevData => {
           const updatedData = [...prevData, newDataPoint];
-          return updatedData.slice(-24);
+          return updatedData.slice(-maxPointsByRange[timeRange]);
+        });
+
+        // Update KPI snapshot from summary endpoint
+        setKpi({
+          avgCongestion: newDataPoint.congestion,
+          avgSpeed: newDataPoint.speed,
+          totalIncidents: newDataPoint.incidents,
         });
 
         setLastUpdate(now);
       }
     } catch (error) {
       console.error('Failed to fetch traffic data for trends:', error);
-    } finally {
-      setLoading(false);
     }
   };
-
-  useEffect(() => {
-    // Initialize with empty data array
-    setData([]);
+useEffect(() => {
+    // Immediately fetch a live snapshot so UI shows data without waiting for trends
     setLoading(true);
-
-    // Fetch real traffic data immediately
-    fetchTrafficData();
-
-    // Set up interval for real-time updates
+    fetchTrafficData().finally(() => setLoading(false));
+    // Fetch historical trends in parallel (does not block rendering)
+    fetchTrends();
+    // Start realtime appends every 30s (configurable later)
     const interval = setInterval(fetchTrafficData, 30000);
-
     return () => clearInterval(interval);
-  }, [selectedCity.id]);
+  }, [selectedCity.id, timeRange]);
 
-  const totalIncidents = data.reduce((sum, point) => sum + point.incidents, 0);
-  const avgCongestion = data.length > 0 ? data.reduce((sum, point) => sum + point.congestion, 0) / data.length : 0;
-  const avgSpeed = data.length > 0 ? data.reduce((sum, point) => sum + point.speed, 0) / data.length : 0;
+  // History-based stats for insights (from analytics series)
+  const totalIncidentsHistorical = data.reduce((sum, point) => sum + point.incidents, 0);
+  const avgCongestionHistorical = data.length > 0 ? data.reduce((sum, point) => sum + point.congestion, 0) / data.length : 0;
+  const avgSpeedHistorical = data.length > 0 ? data.reduce((sum, point) => sum + point.speed, 0) / data.length : 0;
   const peakCongestion = data.length > 0 ? Math.max(...data.map(d => d.congestion)) : 0;
   const minSpeed = data.length > 0 ? Math.min(...data.map(d => d.speed)) : 0;
+
+  // Choose KPI display: prefer history for selected range if available
+  const hasSeries = data.length > 0;
+  const displayKPI = hasSeries
+    ? {
+        avgCongestion: avgCongestionHistorical,
+        avgSpeed: avgSpeedHistorical,
+        totalIncidents: totalIncidentsHistorical,
+      }
+    : kpi;
 
   const getChartIcon = (type: ChartType) => {
     switch (type) {
@@ -355,9 +420,9 @@ const CongestionAnalytics: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Avg Congestion</p>
-                <p className="text-2xl font-bold text-gray-900">{avgCongestion.toFixed(0)}%</p>
+                <p className="text-2xl font-bold text-gray-900">{displayKPI.avgCongestion.toFixed(0)}%</p>
               </div>
-              <ArrowTrendingUpIcon className={`w-8 h-8 ${avgCongestion > 50 ? 'text-red-500' : 'text-green-500'}`} />
+              <ArrowTrendingUpIcon className={`w-8 h-8 ${displayKPI.avgCongestion > 50 ? 'text-red-500' : 'text-green-500'}`} />
             </div>
           </div>
 
@@ -365,9 +430,9 @@ const CongestionAnalytics: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Avg Speed</p>
-                <p className="text-2xl font-bold text-gray-900">{avgSpeed.toFixed(0)} km/h</p>
+                <p className="text-2xl font-bold text-gray-900">{displayKPI.avgSpeed.toFixed(0)} km/h</p>
               </div>
-              <SparklesIcon className={`w-8 h-8 ${avgSpeed > 35 ? 'text-green-500' : 'text-yellow-500'}`} />
+              <SparklesIcon className={`w-8 h-8 ${displayKPI.avgSpeed > 35 ? 'text-green-500' : 'text-yellow-500'}`} />
             </div>
           </div>
 
@@ -385,9 +450,9 @@ const CongestionAnalytics: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Incidents</p>
-                <p className="text-2xl font-bold text-gray-900">{totalIncidents}</p>
+                <p className="text-2xl font-bold text-gray-900">{displayKPI.totalIncidents}</p>
               </div>
-              <MapIcon className={`w-8 h-8 ${totalIncidents > 10 ? 'text-red-500' : 'text-green-500'}`} />
+              <MapIcon className={`w-8 h-8 ${displayKPI.totalIncidents > 10 ? 'text-red-500' : 'text-green-500'}`} />
             </div>
           </div>
         </motion.div>
@@ -486,14 +551,14 @@ const CongestionAnalytics: React.FC = () => {
               <div className="p-4 bg-blue-50 rounded-lg">
                 <h4 className="font-medium text-blue-900 mb-2">Speed Analysis</h4>
                 <p className="text-sm text-blue-700">
-                  Average speed is {avgSpeed.toFixed(0)} km/h. Minimum speed recorded: {minSpeed} km/h
+                  Average speed is {avgSpeedHistorical.toFixed(0)} km/h. Minimum speed recorded: {minSpeed} km/h
                 </p>
               </div>
               
               <div className="p-4 bg-yellow-50 rounded-lg">
                 <h4 className="font-medium text-yellow-900 mb-2">Incident Pattern</h4>
                 <p className="text-sm text-yellow-700">
-                  {totalIncidents} incidents recorded in the last 24 hours. Higher incident rates correlate with peak traffic times.
+                  {totalIncidentsHistorical} incidents recorded in the selected range. Higher incident rates correlate with peak traffic times.
                 </p>
               </div>
 

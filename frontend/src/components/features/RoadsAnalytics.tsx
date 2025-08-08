@@ -18,7 +18,7 @@ import {
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import apiService from '../../services/api';
-import { KENYA_CITIES } from '../../constants';
+import { KENYA_CITIES, CITY_ROADS } from '../../constants';
 
 interface RoadData {
   name: string;
@@ -27,6 +27,7 @@ interface RoadData {
   incidents: number;
   travelTime: number;
   status: 'free' | 'slow' | 'heavy';
+  isRealtime?: boolean;
   coordinates?: [number, number][];
 }
 
@@ -46,21 +47,42 @@ const RoadsAnalytics: React.FC = () => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [roadsData, setRoadsData] = useState<RoadData[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<'congestion' | 'avgSpeed' | 'incidents' | 'travelTime'>('congestion');
+  const [selectedRoadId, setSelectedRoadId] = useState<string>('all');
 
-  // Load roads data for selected city from API
+  // Load roads data for selected city using TomTom-derived metrics per road
   useEffect(() => {
     const fetchRoadsData = async () => {
       setLoading(true);
       try {
-        // Fetch real road data from API
-        const response = await apiService.getTrafficData(selectedCity.id);
-        if (response.success && response.data) {
-          // Transform API response to road data format
-          // This would depend on your actual API structure
-          setRoadsData([]);
-        } else {
-          setRoadsData([]);
-        }
+        const roads = CITY_ROADS[selectedCity.id as keyof typeof CITY_ROADS] || [];
+        const targets = selectedRoadId === 'all' ? roads.filter(r => r.id !== 'all') : roads.filter(r => r.id === selectedRoadId);
+
+        const results = await Promise.all(
+          targets.map(async (road) => {
+            const res = await apiService.getRoadMetrics(selectedCity.id, road.id);
+            if (res.success) {
+              return {
+                name: road.name,
+                congestion: res.data.congestion,
+                avgSpeed: res.data.avgSpeed,
+                incidents: res.data.incidents,
+                travelTime: res.data.travelTime,
+                status: res.data.status,
+                isRealtime: res.data.isRealtime,
+              } as RoadData;
+            }
+            return {
+              name: road.name,
+              congestion: 0,
+              avgSpeed: 0,
+              incidents: 0,
+              travelTime: 0,
+              status: 'free'
+            } as RoadData;
+          })
+        );
+
+        setRoadsData(results);
         setLastUpdate(new Date());
       } catch (error) {
         console.error('Failed to fetch roads data:', error);
@@ -71,20 +93,41 @@ const RoadsAnalytics: React.FC = () => {
     };
 
     fetchRoadsData();
-  }, [selectedCity.id]);
+  }, [selectedCity.id, selectedRoadId]);
 
   // Auto-refresh data every 30 seconds using real API data
   useEffect(() => {
     const refreshData = async () => {
       if (!loading) {
         try {
-          // Fetch fresh data from API
-          const response = await apiService.getTrafficData(selectedCity.id);
-          if (response.success && response.data) {
-            // Transform API response to road data format (similar to initial fetch)
-            // This keeps your refresh logic in sync with the initial load logic
-            setLastUpdate(new Date());
-          }
+          const roads = CITY_ROADS[selectedCity.id as keyof typeof CITY_ROADS] || [];
+          const targets = selectedRoadId === 'all' ? roads.filter(r => r.id !== 'all') : roads.filter(r => r.id === selectedRoadId);
+          const results = await Promise.all(
+            targets.map(async (road) => {
+              const res = await apiService.getRoadMetrics(selectedCity.id, road.id);
+              if (res.success) {
+                return {
+                  name: road.name,
+                  congestion: res.data.congestion,
+                  avgSpeed: res.data.avgSpeed,
+                  incidents: res.data.incidents,
+                  travelTime: res.data.travelTime,
+                  status: res.data.status,
+                  isRealtime: res.data.isRealtime,
+                } as RoadData;
+              }
+              return {
+                name: road.name,
+                congestion: 0,
+                avgSpeed: 0,
+                incidents: 0,
+                travelTime: 0,
+                status: 'free'
+              } as RoadData;
+            })
+          );
+          setRoadsData(results);
+          setLastUpdate(new Date());
         } catch (error) {
           console.error('Error refreshing road data:', error);
         }
@@ -93,7 +136,7 @@ const RoadsAnalytics: React.FC = () => {
 
     const interval = setInterval(refreshData, 30000);
     return () => clearInterval(interval);
-  }, [selectedCity.id, loading]);
+  }, [selectedCity.id, selectedRoadId, loading]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -308,7 +351,10 @@ const RoadsAnalytics: React.FC = () => {
                   value={selectedCity.id}
                   onChange={(e) => {
                     const city = KENYA_CITIES.find(c => c.id === e.target.value);
-                    if (city) setSelectedCity(city);
+                    if (city) {
+                      setSelectedCity(city);
+                      setSelectedRoadId('all');
+                    }
                   }}
                   className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
@@ -332,11 +378,38 @@ const RoadsAnalytics: React.FC = () => {
                 </select>
               </div>
 
-              {/* Live Status */}
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-gray-600 font-medium">Live Data</span>
+              {/* Road Selector */}
+              <div className="relative">
+                <select
+                  value={selectedRoadId}
+                  onChange={(e) => setSelectedRoadId(e.target.value)}
+                  className="bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {(CITY_ROADS[selectedCity.id as keyof typeof CITY_ROADS] || []).map(road => (
+                    <option key={road.id} value={road.id}>{road.name}</option>
+                  ))}
+                </select>
               </div>
+
+              {/* Live Status */}
+              {(() => {
+                const anyData = roadsData.length > 0;
+                const allRealtime = anyData && roadsData.every(r => r.isRealtime);
+                if (allRealtime) {
+                  return (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-gray-600 font-medium">Live Data</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-gray-600 font-medium">System Offline (Simulated)</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
