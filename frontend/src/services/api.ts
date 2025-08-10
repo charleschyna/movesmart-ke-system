@@ -2,7 +2,6 @@ import services from '@tomtom-international/web-sdk-services';
 import axios, { AxiosInstance } from 'axios';
 import { 
   APIResponse, 
-  User, 
   TrafficData, 
   Route, 
   Incident, 
@@ -10,6 +9,7 @@ import {
   SimulationResult, 
   SustainabilityData 
 } from '../types';
+import type { User as AuthUser } from '../types/auth';
 import { API_BASE_URL, API_ENDPOINTS, STORAGE_KEYS } from '../constants';
 
 class ApiService {
@@ -29,7 +29,8 @@ class ApiService {
       (config) => {
         const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          // DRF TokenAuthentication expects: Authorization: Token <key>
+          config.headers.Authorization = `Token ${token}`;
         }
         return config;
       },
@@ -52,12 +53,17 @@ class ApiService {
   }
 
   // Authentication Methods
-  async login(username: string, password: string): Promise<APIResponse<{ user: User; token: string }>> {
+  async login(username: string, password: string): Promise<APIResponse<{ user: AuthUser; token: string }>> {
     try {
       const response = await this.api.post(API_ENDPOINTS.AUTH.LOGIN, { username, password });
-      return response.data;
+      const { user, token, message } = response.data || {};
+      if (!user || !token) {
+        throw new Error('Invalid login response');
+      }
+      return { success: true, data: { user, token }, message };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+      const errMsg = error?.response?.data?.error || error?.response?.data?.message || error.message || 'Login failed';
+      throw new Error(errMsg);
     }
   }
 
@@ -66,7 +72,7 @@ class ApiService {
     password: string;
     name: string;
     defaultCity: string;
-  }): Promise<APIResponse<{ user: User; token: string }>> {
+  }): Promise<APIResponse<{ user: AuthUser; token: string }>> {
     try {
       const response = await this.api.post(API_ENDPOINTS.AUTH.REGISTER, userData);
       return response.data;
@@ -86,12 +92,17 @@ class ApiService {
     }
   }
 
-  async googleLogin(googleToken: string): Promise<APIResponse<{ user: User; token: string; is_new_user: boolean }>> {
+  async googleLogin(googleToken: string): Promise<APIResponse<{ user: AuthUser; token: string; is_new_user: boolean }>> {
     try {
       const response = await this.api.post(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, { token: googleToken });
-      return response.data;
+      const { user, token, is_new_user, message } = response.data || {};
+      if (!user || !token) {
+        throw new Error('Invalid Google login response');
+      }
+      return { success: true, data: { user, token, is_new_user: !!is_new_user }, message };
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Google login failed');
+      const errMsg = error?.response?.data?.error || error?.response?.data?.message || error.message || 'Google login failed';
+      throw new Error(errMsg);
     }
   }
 
@@ -175,15 +186,12 @@ class ApiService {
 
   async getLiveIncidents(cityId: string): Promise<APIResponse<any[]>> {
     try {
-      const response = await this.api.get(`${API_ENDPOINTS.TRAFFIC.GET_INCIDENTS}/?city=${cityId}`);
-      return {
-        success: true,
-        message: 'Successfully fetched live incidents.',
-        data: response.data
-      };
+      const response = await this.api.get(`/api/incidents/live_incidents/?city=${encodeURIComponent(cityId[0].toUpperCase() + cityId.slice(1))}`);
+      // Backend returns { incidents: [...], total_count, city, timestamp }
+      const data = response.data?.incidents || [];
+      return { success: true, message: 'OK', data } as APIResponse<any[]>;
     } catch (error: any) {
-      console.error('Failed to fetch live incidents:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch live incidents');
+      return { success: false, message: error.response?.data?.message || 'Failed to fetch live incidents', data: [] } as APIResponse<any[]>;
     }
   }
 

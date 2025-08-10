@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import NotificationBell from '../notifications/NotificationBell';
 
 // Types
 interface TrafficData {
@@ -147,7 +148,8 @@ const NewDashboard: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">Traffic Dashboard</h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          {/* Add notification bell to the top actions area */}
+          <div className="ml-auto flex items-center gap-3">
             {/* City Selector */}
             <div className="flex items-center gap-2">
               <span style={{fontSize: '16px'}}>📍</span>
@@ -185,6 +187,7 @@ const NewDashboard: React.FC = () => {
               <span style={{fontSize: '14px', animation: loading ? 'spin 1s linear infinite' : 'none'}}>🔄</span>
               Refresh
             </button>
+            <NotificationBell />
           </div>
         </div>
 

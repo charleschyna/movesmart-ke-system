@@ -1,9 +1,10 @@
-// API Configuration
-// In development, use empty string to let Vite proxy handle the requests
-// In production, use the full API URL
-export const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.REACT_APP_API_URL || 'https://api.movesmart.ke'
-  : '';
+// API Configuration (Vite)
+// - Use `VITE_API_BASE_URL` when provided
+// - Default to localhost in development
+// - Default to hosted API in production
+export const API_BASE_URL = import.meta.env.PROD
+  ? (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://api.movesmart.ke'
+  : (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://127.0.0.1:8000';
 
 // API Endpoints
 export const API_ENDPOINTS = {

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { LoginRequest, RegisterRequest, AuthResponse } from '../types/auth';
-
-const API_BASE_URL = 'http://127.0.0.1:8000';
+import { API_BASE_URL, STORAGE_KEYS, API_ENDPOINTS } from '../constants';
 
 const authAPI = axios.create({
   baseURL: API_BASE_URL,
@@ -12,7 +11,7 @@ const authAPI = axios.create({
 
 // Add token to requests if available
 authAPI.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
   if (token) {
     config.headers.Authorization = `Token ${token}`;
   }
@@ -22,19 +21,19 @@ authAPI.interceptors.request.use((config) => {
 export const authService = {
   // Login with username/password
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await authAPI.post('/auth/login/', data);
+    const response = await authAPI.post(API_ENDPOINTS.AUTH.LOGIN, data);
     return response.data;
   },
 
   // Register new user
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await authAPI.post('/auth/register/', data);
+    const response = await authAPI.post(API_ENDPOINTS.AUTH.REGISTER, data);
     return response.data;
   },
 
   // Get user profile
   async getProfile() {
-    const response = await authAPI.get('/auth/profile/');
+    const response = await authAPI.get(API_ENDPOINTS.AUTH.PROFILE);
     return response.data;
   },
 
@@ -55,14 +54,14 @@ export const authService = {
 
   // Logout
   async logout() {
-    const response = await authAPI.post('/auth/logout/');
+    const response = await authAPI.post(API_ENDPOINTS.AUTH.LOGOUT);
     return response.data;
   },
 
   // Google OAuth login
   async googleLogin(credential: string): Promise<AuthResponse> {
-    const response = await authAPI.post('/auth/google/', {
-      credential,
+    const response = await authAPI.post(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, {
+      token: credential,
     });
     return response.data;
   },

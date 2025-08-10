@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { User, AuthContextType, RegisterRequest } from '../types/auth';
 import { authService } from '../services/authService';
+import { STORAGE_KEYS } from '../constants';
 import { toast } from 'react-hot-toast';
 
 interface AuthState {
@@ -16,7 +17,7 @@ type AuthAction =
 
 const initialState: AuthState = {
   user: null,
-  token: localStorage.getItem('token'),
+  token: localStorage.getItem(STORAGE_KEYS.TOKEN),
   loading: false,
 };
 
@@ -81,7 +82,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       const response = await authService.login({ username, password });
       
-      localStorage.setItem('token', response.token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
       dispatch({
         type: 'SET_USER',
         payload: {
@@ -104,7 +106,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       const response = await authService.register(data);
       
-      localStorage.setItem('token', response.token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
       dispatch({
         type: 'SET_USER',
         payload: {
@@ -127,7 +130,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       const response = await authService.googleLogin(credential);
       
-      localStorage.setItem('token', response.token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, response.token);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
       dispatch({
         type: 'SET_USER',
         payload: {
@@ -153,7 +157,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('token');
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.USER);
       dispatch({ type: 'CLEAR_USER' });
       toast.success('Logged out successfully');
     }

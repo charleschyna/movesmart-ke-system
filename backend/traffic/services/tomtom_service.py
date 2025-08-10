@@ -118,15 +118,25 @@ class TomTomService:
         try:
             response = self.session.get(url, params=params, timeout=15) # 15-second timeout
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            # Ensure consistent structure
+            if isinstance(data, dict) and 'incidents' in data:
+                return data
+            # Some responses may nest differently; normalize
+            if isinstance(data, dict) and 'tm' in data and isinstance(data['tm'], dict) and 'poi' in data['tm']:
+                # Older v4-like structure
+                incidents = data['tm']['poi']
+                return {'incidents': incidents}
+            logger.warning(f"Unexpected TomTom incidents payload structure: keys={list(data)[:5]}")
+            return {'incidents': []}
         except json.JSONDecodeError:
-            logger.error(f"Failed to decode JSON from TomTom API. Status: {response.status_code}, Response: {response.text}")
-            return {}
+            logger.error(f"Failed to decode JSON from TomTom API for incidents. URL: {url} params: {params}")
+            return {'incidents': []}
         except requests.RequestException as e:
             logger.error(f"Error fetching traffic incidents: {e}")
             logger.error(f"URL: {url}")
             logger.error(f"Params: {params}")
-            return {}
+            return {'incidents': []}
     
     def get_traffic_flow_tile(self, x: int, y: int, zoom: int, style: str = "absolute") -> Optional[bytes]:
         """

@@ -28,7 +28,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import PredictiveAnalytics from '../features/PredictiveAnalytics';
 import ReportsExports from '../features/ReportsExports';
 import IncidentManagement from '../features/IncidentManagement';
-import NotificationCenter from '../features/NotificationCenter';
+import NotificationCenter from '../notifications/NotificationCenter';
 import Settings from '../features/Settings';
 import StatsCards from './StatsCards';
 import TrafficReportSection from '../features/TrafficReportSection';
@@ -39,10 +39,12 @@ import AreaComparison from '../charts/AreaComparison';
 import RoadsAnalytics from '../features/RoadsAnalytics';
 import CongestionAnalytics from '../features/CongestionAnalytics';
 import WeatherPage from '../features/WeatherPage';
-import WeatherWidget from '../common/WeatherWidget';
 import TrafficSignalControl from '../features/TrafficSignalControl';
+import NotificationBell from '../notifications/NotificationBell';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITY);
   const [trafficData, setTrafficData] = useState<TrafficData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,8 @@ const Dashboard: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const fetchDashboardData = React.useCallback(async () => {
     setLoading(true);
@@ -119,6 +123,9 @@ const Dashboard: React.FC = () => {
       if (citySelectorRef.current && !citySelectorRef.current.contains(event.target as Node)) {
         setIsCitySelectorOpen(false);
       }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -133,6 +140,16 @@ const Dashboard: React.FC = () => {
 
     window.addEventListener('navigate-to-ai-reports', handleNavigateToAiReports);
     return () => window.removeEventListener('navigate-to-ai-reports', handleNavigateToAiReports);
+  }, []);
+
+  // Open Notification Center tab when triggered from the bell dropdown "View all"
+  useEffect(() => {
+    const handleNavigateToNotifications = () => {
+      setActiveNavItem('notifications');
+    };
+
+    window.addEventListener('navigate-to-notifications', handleNavigateToNotifications);
+    return () => window.removeEventListener('navigate-to-notifications', handleNavigateToNotifications);
   }, []);
 
   // Initialize map when dashboard is active
@@ -401,7 +418,6 @@ const Dashboard: React.FC = () => {
         { id: 'reports', label: 'Report Templates', icon: DocumentTextIcon }
       ]
     },
-    { id: 'weather', label: 'Weather Conditions', icon: CloudIcon, active: false },
     { id: 'liveIncidents', label: 'Live Incidents', icon: ExclamationTriangleIcon, active: false },
     { id: 'incidents', label: 'Incident Management', icon: ExclamationCircleIcon, active: false },
     { id: 'notifications', label: 'Notification Center', icon: BellIcon, active: false },
@@ -410,23 +426,8 @@ const Dashboard: React.FC = () => {
 
   // Get dynamic user data from localStorage or context
   const [currentUser, setCurrentUser] = useState(() => {
-    // Try to get user from demo storage (from signup)
-    const demoUser = localStorage.getItem('demo_user');
-    if (demoUser) {
-      const userData = JSON.parse(demoUser);
-      const firstInitial = userData.first_name ? userData.first_name.charAt(0).toUpperCase() : userData.username.charAt(0).toUpperCase();
-      const lastInitial = userData.last_name ? userData.last_name.charAt(0).toUpperCase() : (userData.username.length > 1 ? userData.username.charAt(1).toUpperCase() : userData.email.charAt(0).toUpperCase());
-      return {
-        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
-        role: 'Traffic Analyst',
-        avatar: '/api/placeholder/40/40',
-        initials: `${firstInitial}${lastInitial}`,
-        email: userData.email
-      };
-    }
-    
-    // Try to get user from regular auth storage
-    const authUser = localStorage.getItem('user');
+    // Prefer authenticated user
+    const authUser = localStorage.getItem(STORAGE_KEYS.USER);
     if (authUser) {
       try {
         const userData = JSON.parse(authUser);
@@ -442,6 +443,21 @@ const Dashboard: React.FC = () => {
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
+    }
+    
+    // Fallback to demo storage (if present)
+    const demoUser = localStorage.getItem('demo_user');
+    if (demoUser) {
+      const userData = JSON.parse(demoUser);
+      const firstInitial = userData.first_name ? userData.first_name.charAt(0).toUpperCase() : userData.username.charAt(0).toUpperCase();
+      const lastInitial = userData.last_name ? userData.last_name.charAt(0).toUpperCase() : (userData.username.length > 1 ? userData.username.charAt(1).toUpperCase() : userData.email.charAt(0).toUpperCase());
+      return {
+        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+        role: 'Traffic Analyst',
+        avatar: '/api/placeholder/40/40',
+        initials: `${firstInitial}${lastInitial}`,
+        email: userData.email
+      };
     }
     
     // Fallback to demo user
@@ -735,13 +751,8 @@ const Dashboard: React.FC = () => {
             </motion.div>
           </div>
 
-          {/* Right Section - Simplified */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex items-center space-x-3"
-          >
+          {/* Top actions area */}
+          <div className="ml-auto flex items-center gap-3">
             {/* Live Status */}
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
@@ -749,10 +760,7 @@ const Dashboard: React.FC = () => {
             </div>
             
             {/* Weather Widget */}
-            <WeatherWidget 
-              selectedCity={selectedCity}
-              onClick={() => setActiveNavItem('weather')}
-            />
+            {/* Removed WeatherWidget import, so it's no longer rendered here */}
 
             {/* Time */}
             <div className="hidden lg:flex items-center space-x-2 text-sm text-gray-600">
@@ -767,21 +775,71 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Notifications */}
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200">
-              <BellIcon className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
-            </button>
+            <NotificationBell />
 
             {/* User Profile - Simplified */}
-            <div className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-1.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">{currentUser.initials}</span>
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
-              </div>
+            <div className="relative" ref={profileRef}>
+              <button
+                onClick={() => setIsProfileOpen(o => !o)}
+                className="flex items-center space-x-2 bg-gray-50 rounded-lg px-3 py-1.5 hover:bg-gray-100"
+                aria-haspopup="menu"
+                aria-expanded={isProfileOpen}
+              >
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">{currentUser.initials}</span>
+                </div>
+                <div className="hidden sm:block text-left">
+                  <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-4"
+                    role="menu"
+                  >
+                    <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">{currentUser.initials}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{currentUser.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
+                        <p className="text-xs text-gray-500">{currentUser.role}</p>
+                      </div>
+                    </div>
+                    <div className="pt-3 flex flex-col gap-2">
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-50 text-gray-700"
+                        role="menuitem"
+                      >
+                        Account settings
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await apiService.logout();
+                          } finally {
+                            navigate('/');
+                          }
+                        }}
+                        className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-red-50 text-red-600"
+                        role="menuitem"
+                      >
+                        Log out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </motion.div>
+          </div>
         </motion.header>
 
         {/* Main Content - Conditional rendering based on activeNavItem */}

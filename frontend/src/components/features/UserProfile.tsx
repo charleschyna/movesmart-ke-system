@@ -27,6 +27,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { User, NotificationPreferences } from '../../types';
 import { toast } from 'react-hot-toast';
+import { STORAGE_KEYS } from '../../constants';
 
 interface ProfileStats {
   totalTrips: number;
@@ -53,29 +54,8 @@ const UserProfile: React.FC = () => {
   
   // Get dynamic user data from localStorage
   const [profileData, setProfileData] = useState<User>(() => {
-    // Try to get user from demo storage (from signup)
-    const demoUser = localStorage.getItem('demo_user');
-    if (demoUser) {
-      const userData = JSON.parse(demoUser);
-      return {
-        id: userData.id?.toString() || '1',
-        email: userData.email,
-        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
-        defaultCity: 'Nairobi',
-        savedRoutes: [],
-        notificationPreferences: {
-          emailNotifications: true,
-          pushNotifications: true,
-          trafficAlerts: true,
-          incidentAlerts: true,
-          routeUpdates: false
-        },
-        createdAt: new Date().toISOString()
-      };
-    }
-    
-    // Try to get user from regular auth storage
-    const authUser = localStorage.getItem('user');
+    // Prefer authenticated user storage
+    const authUser = localStorage.getItem(STORAGE_KEYS.USER);
     if (authUser) {
       try {
         const userData = JSON.parse(authUser);
@@ -97,6 +77,27 @@ const UserProfile: React.FC = () => {
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
+    }
+    
+    // Fallback to demo storage (from signup)
+    const demoUser = localStorage.getItem('demo_user');
+    if (demoUser) {
+      const userData = JSON.parse(demoUser);
+      return {
+        id: userData.id?.toString() || '1',
+        email: userData.email,
+        name: userData.first_name ? `${userData.first_name} ${userData.last_name || ''}`.trim() : userData.username,
+        defaultCity: 'Nairobi',
+        savedRoutes: [],
+        notificationPreferences: {
+          emailNotifications: true,
+          pushNotifications: true,
+          trafficAlerts: true,
+          incidentAlerts: true,
+          routeUpdates: false
+        },
+        createdAt: new Date().toISOString()
+      };
     }
     
     // Fallback to demo user
