@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,6 +30,9 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-movesmart-kenya-traff
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+
+# Demo mode for local/dev without external services
+DEMO_MODE = os.environ.get('DEMO_MODE', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 
@@ -142,6 +146,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+# Location for collected static files (required for collectstatic on Railway)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (optional but useful)
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -155,7 +165,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Allow all for now, can be changed per view
+        'rest_framework.permissions.IsAuthenticated',  # Secure by default; open explicitly per view/action
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -164,20 +174,40 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20
 }
 
-# CORS configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+# CORS/CSRF configuration
+# In production, configure via environment variables:
+#   CORS_ALLOWED_ORIGINS=https://frontend.example.com,https://app.example.com
+#   CSRF_TRUSTED_ORIGINS=https://frontend.example.com
+_raw_cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
+if _raw_cors_origins:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors_origins.split(',') if o.strip()]
+else:
+    # Defaults for local development
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ] if DEBUG else []
 
 CORS_ALLOW_CREDENTIALS = True
+# Only allow all origins in development
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 
-CORS_ALLOW_ALL_ORIGINS = True  # Only for development
+_raw_csrf_trusted = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if _raw_csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _raw_csrf_trusted.split(',') if o.strip()]
+else:
+    # If not provided, trust the same set as CORS (https recommended)
+    CSRF_TRUSTED_ORIGINS = [o.replace('http://', 'https://') for o in CORS_ALLOWED_ORIGINS]
 
 # TomTom API Configuration
 TOMTOM_API_KEY = os.environ.get('TOMTOM_API_KEY')
 if not TOMTOM_API_KEY:
-    raise ValueError("TOMTOM_API_KEY environment variable is required")
+    if DEBUG or DEMO_MODE:
+        logging.getLogger(__name__).warning(
+            "TOMTOM_API_KEY not set. Running with simulated data in DEBUG/DEMO_MODE.")
+        TOMTOM_API_KEY = None
+    else:
+        raise ValueError("TOMTOM_API_KEY environment variable is required in production")
 
 # OpenAI API Configuration (optional)
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -186,9 +216,12 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 AI_MODEL = os.environ.get('AI_MODEL', 'deepseek/deepseek-r1-0528-qwen3-8b:free')
 
-# Google OAuth Configuration
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '759211220044-od9no67r0ks0ai8sjb697o8igc3irn8o.apps.googleusercontent.com')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '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')
+# Google OAuth Configuration (must be provided via environment)
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+if DEBUG and (not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET):
+    logging.getLogger(__name__).warning(
+        "Google OAuth credentials are not set. Google login will be disabled in development.")
 
 LOGGING = {
     'version': 1,

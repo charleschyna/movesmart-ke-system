@@ -45,19 +45,18 @@ python manage.py runserver  # Backend
 ```
 movesmart-ke/
 ├── frontend/           # React frontend application
-├── backend/           # Django/FastAPI backend
-├── ai-models/         # ML models and training scripts
-├── docs/             # Documentation
-├── docker-compose.yml # Docker configuration
-└── README.md         # This file
+├── backend/            # Django backend (DRF)
+├── docs/               # Documentation
+├── docker-compose.yml  # Docker configuration
+└── README.md           # This file
 ```
 
 ## 🛠️ Tech Stack
-- **Frontend**: React, TailwindCSS, Framer Motion
-- **Backend**: Django/FastAPI, PostgreSQL
-- **AI/ML**: Python, scikit-learn, TensorFlow, FastAPI
-- **Maps**: TOMTOM API
-- **Notifications**: Firebase Cloud Messaging
+- **Frontend**: React (Vite + TypeScript), TailwindCSS, Framer Motion
+- **Backend**: Django REST Framework, PostgreSQL, Redis (Celery-ready)
+- **AI/ML**: Python, scikit-learn, TensorFlow (planned)
+- **Maps**: TomTom API
+- **Notifications**: Firebase Cloud Messaging (planned)
 
 ## 📱 Key Features
 - Real-time traffic monitoring

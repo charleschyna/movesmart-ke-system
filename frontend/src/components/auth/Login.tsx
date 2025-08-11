@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/react/24/outline';
@@ -138,13 +139,13 @@ const Login: React.FC = () => {
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: 'spring' }}
             className="mx-auto rounded-full flex items-center justify-center mb-3 overflow-hidden"
-            style={{ width: '60px', height: '60px' }}
+            style={{ width: '128px', height: '128px' }}
           >
             <img
               src="/NEW-removebg-preview.png"
               alt="MoveSmart KE Logo"
               className="object-contain"
-              style={{ width: '60px', height: '60px' }}
+              style={{ width: '128px', height: '128px' }}
             />
           </motion.div>
           <h2 className="text-3xl font-bold text-gray-900">Welcome to MoveSmart KE</h2>

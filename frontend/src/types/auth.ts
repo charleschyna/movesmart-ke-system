@@ -7,6 +7,8 @@ export interface User {
   is_active: boolean;
   date_joined: string;
   last_login?: string;
+  roles?: string[];
+  permissions?: string[];
 }
 
 export interface AuthResponse {
@@ -41,4 +43,6 @@ export interface AuthContextType {
   loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
+  hasRole: (role: string) => boolean;
+  hasPerm: (perm: string) => boolean;
 }

@@ -61,7 +61,20 @@ const mockSignals = [
   }
 ];
 
+import { useAuth } from '../../contexts/AuthContext';
+
 const TrafficSignalControl: React.FC = () => {
+  const { hasPerm } = useAuth();
+  if (!hasPerm('control:write')) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-lg p-6 shadow-sm">
+          <h2 className="text-xl font-semibold mb-2">Traffic Signal Control</h2>
+          <p className="text-gray-600">You do not have permission to control traffic signals.</p>
+        </div>
+      </div>
+    );
+  }
   const [selectedSignal, setSelectedSignal] = useState<string | null>(null);
   const [overrideMode, setOverrideMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'control' | 'timing'>('overview');

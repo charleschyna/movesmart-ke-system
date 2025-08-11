@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import json
 import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +23,22 @@ class TomTomService:
             'Content-Type': 'application/json',
             'User-Agent': 'MoveSmart-Traffic-System/1.0'
         })
-        # Add retry configuration
-        self.max_retries = 3
-        self.retry_delay = 1.0
+        # Add retry configuration to session
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=("GET", "POST")
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         
-        # Test API key on initialization
-        self._test_api_key()
+        # Test API key on initialization only if present
+        if self.api_key:
+            self._test_api_key()
+        else:
+            logger.info("TomTom API key not set; service will use fallback/simulated data where applicable.")
     
     def _test_api_key(self) -> bool:
         """

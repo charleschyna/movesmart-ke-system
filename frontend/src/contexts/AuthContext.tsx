@@ -164,6 +164,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+const hasRole = (role: string) => {
+    const roles = state.user?.roles || [];
+    return roles.includes('admin') || roles.includes(role);
+  };
+
+  const hasPerm = (perm: string) => {
+    const perms = state.user?.permissions || [];
+    if (!perms || perms.length === 0) return false;
+    if (perms.includes(perm)) return true;
+    // support wildcard like incidents:*
+    const [ns] = perm.split(':');
+    return perms.some(p => p === `${ns}:*`);
+  };
+
   const value: AuthContextType = {
     user: state.user,
     token: state.token,
@@ -172,6 +186,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loginWithGoogle,
     logout,
     loading: state.loading,
+    hasRole,
+    hasPerm,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

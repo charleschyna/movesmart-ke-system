@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from authentication.permissions import RolePermission
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -31,30 +32,24 @@ class TrafficDataViewSet(viewsets.ViewSet):
 
 class TrafficReportViewSet(viewsets.ViewSet):
     """API endpoints for generating and retrieving traffic reports."""
-    
-    def get_permissions(self):
-        """
-        Instantiate and return the list of permissions that this view requires.
-        Make dashboard endpoints and report generation endpoints public for easier access.
-        """
-        public_actions = [
-            'city_summary', 
-            'live_traffic', 
-            'incidents', 
-            'congestion_trends',
-            'generate_report',
-            'generate_detailed_report', 
-            'generate_comprehensive_report',
-            'reverse_geocode',
-            'geocode'
-        ]
-        
-        if self.action in public_actions:
-            permission_classes = [AllowAny]
-        else:
-            permission_classes = [IsAuthenticated]
-            
-        return [permission() for permission in permission_classes]
+
+    permission_classes = [RolePermission]
+
+    # Explicit required permissions per action
+    REQUIRED_PERMISSIONS = {
+        # Reading existing reports and summaries
+        'list_reports': ['reports:read'],
+        'get_report': ['reports:read'],
+        'delete_report': ['reports:read'],
+        # Generating reports
+        'generate_report': ['reports:generate'],
+        'generate_detailed_report': ['reports:generate'],
+        'generate_comprehensive_report': ['reports:generate'],
+        # Utilities
+        'reverse_geocode': ['traffic:read'],
+        # If you later add exports:
+        # 'export_report': ['reports:export'],
+    }
 
     @action(detail=False, methods=['get'])
     def list_reports(self, request):
@@ -134,6 +129,18 @@ class TrafficReportViewSet(viewsets.ViewSet):
             # Get the report, but only if it belongs to the current user
             traffic_report = get_object_or_404(TrafficReport, id=pk, user=request.user)
             traffic_report.delete()
+
+            # Audit log
+            try:
+                from incidents.models import AuditLog
+                AuditLog.objects.create(
+                    user=request.user if request.user.is_authenticated else None,
+                    action='report_delete',
+                    details={'report_id': pk}
+                )
+            except Exception:
+                pass
+
             return Response(
                 {'message': 'Report deleted successfully'}, 
                 status=status.HTTP_200_OK
@@ -211,6 +218,17 @@ class TrafficReportViewSet(viewsets.ViewSet):
             incident_count=len(incidents_data.get('incidents', [])),
             user=request.user if request.user.is_authenticated else None  # Associate report with authenticated user if available
         )
+
+        # Audit log
+        try:
+            from incidents.models import AuditLog
+            AuditLog.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                action='report_generate',
+                details={'report_id': traffic_report.id, 'title': traffic_report.title}
+            )
+        except Exception:
+            pass
 
         report_serializer = TrafficReportSerializer(traffic_report)
         return Response(report_serializer.data, status=status.HTTP_201_CREATED)

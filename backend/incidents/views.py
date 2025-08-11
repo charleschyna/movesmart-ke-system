@@ -5,12 +5,28 @@ from django.shortcuts import render
 from .models import Incident, IncidentComment
 from .serializers import IncidentSerializer, IncidentCommentSerializer
 from traffic.services.tomtom_service import TomTomService
+from authentication.permissions import RolePermission
 
 
 class IncidentViewSet(viewsets.ModelViewSet):
     """ViewSet for managing incidents."""
     queryset = Incident.objects.all()
     serializer_class = IncidentSerializer
+    permission_classes = [RolePermission]
+
+    # Action -> required perms mapping
+    REQUIRED_PERMISSIONS = {
+        'list': ['incidents:read'],
+        'retrieve': ['incidents:read'],
+        'create': ['incidents:manage'],
+        'update': ['incidents:manage'],
+        'partial_update': ['incidents:manage'],
+        'destroy': ['incidents:manage'],
+        'resolve': ['incidents:manage'],
+        'active': ['incidents:read'],
+        'statistics': ['incidents:read'],
+        'live_incidents': ['traffic:read'],
+    }
     
     def get_queryset(self):
         """Filter incidents by status or location if provided."""
@@ -31,6 +47,18 @@ class IncidentViewSet(viewsets.ModelViewSet):
         incident = self.get_object()
         incident.status = 'resolved'
         incident.save()
+        
+        # Audit log
+        try:
+            from .models import AuditLog
+            AuditLog.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                action='incident_resolve',
+                details={'incident_id': incident.id, 'title': incident.title}
+            )
+        except Exception:
+            pass
+        
         serializer = self.get_serializer(incident)
         return Response(serializer.data, status=status.HTTP_200_OK)
     

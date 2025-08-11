@@ -3,8 +3,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files explicitly to avoid Windows glob issues
+COPY package.json package-lock.json ./
 
 # Install dependencies
 RUN npm install

@@ -52,6 +52,14 @@ def register_user(request):
             last_name=last_name
         )
         
+        # Default role assignment: viewer
+        try:
+            from django.contrib.auth.models import Group
+            viewer_group, _ = Group.objects.get_or_create(name='viewer')
+            user.groups.add(viewer_group)
+        except Exception:
+            pass
+        
         # Create token for the user
         token, created = Token.objects.get_or_create(user=user)
         
@@ -155,7 +163,14 @@ def user_profile(request):
     Get user profile information
     """
     try:
+        from .roles import ROLE_PERMISSIONS
         user = request.user
+        # Collect roles (group names)
+        roles = list(user.groups.values_list('name', flat=True))
+        # Compute permissions from roles (deduplicated)
+        perms = set()
+        for r in roles:
+            perms.update(ROLE_PERMISSIONS.get(r, []))
         return Response({
             'user': {
                 'id': user.id,
@@ -166,6 +181,8 @@ def user_profile(request):
                 'is_active': user.is_active,
                 'date_joined': user.date_joined,
                 'last_login': user.last_login,
+                'roles': roles,
+                'permissions': sorted(list(perms)),
             }
         }, status=status.HTTP_200_OK)
         
@@ -290,6 +307,15 @@ def google_login(request):
                 {'error': 'Invalid Google token or authentication failed'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
+        
+        # Ensure default viewer role if user has no roles yet
+        try:
+            if not user.groups.exists():
+                from django.contrib.auth.models import Group
+                viewer_group, _ = Group.objects.get_or_create(name='viewer')
+                user.groups.add(viewer_group)
+        except Exception:
+            pass
         
         return Response({
             'message': 'Google login successful',

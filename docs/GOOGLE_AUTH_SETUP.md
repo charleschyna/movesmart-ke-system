@@ -10,17 +10,16 @@ This guide explains how to set up and use Google Sign-In for the MoveSmart KE ap
 ## Configuration
 
 ### 1. Google Cloud Console Setup
-Your Google OAuth credentials are already configured:
-- **Client ID**: `759211220044-od9no67r0ks0ai8sjb697o8igc3irn8o.apps.googleusercontent.com`
-- **Client Secret**: `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`
+Create your own OAuth 2.0 credentials in your Google Cloud project:
+- Client ID: {{YOUR_GOOGLE_CLIENT_ID}}
+- Client Secret: {{YOUR_GOOGLE_CLIENT_SECRET}}
 
-**Important**: For production, you should:
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create your own OAuth 2.0 credentials
-3. Add authorized JavaScript origins:
+Important:
+1. Go to Google Cloud Console and create OAuth 2.0 credentials
+2. Add authorized JavaScript origins:
    - `http://localhost:3000` (development)
    - `https://your-domain.com` (production)
-4. Add authorized redirect URIs if needed
+3. Add authorized redirect URIs if needed
 
 ### 2. Backend Setup
 
@@ -31,18 +30,18 @@ pip install google-auth google-auth-oauthlib google-auth-httplib2
 ```
 
 #### Environment Variables
-The following are already configured in `backend/.env`:
+Set the following in `backend/.env` (or system env):
 ```env
-GOOGLE_CLIENT_ID=759211220044-od9no67r0ks0ai8sjb697o8igc3irn8o.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
+GOOGLE_CLIENT_ID={{YOUR_GOOGLE_CLIENT_ID}}
+GOOGLE_CLIENT_SECRET={{YOUR_GOOGLE_CLIENT_SECRET}}
 ```
 
 ### 3. Frontend Setup
 
 #### Environment Variables
-The following is already configured in `frontend/.env.local`:
+Set in `frontend/.env.local` or `frontend/.env`:
 ```env
-VITE_GOOGLE_CLIENT_ID=759211220044-od9no67r0ks0ai8sjb697o8igc3irn8o.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID={{YOUR_GOOGLE_CLIENT_ID}}
 ```
 
 ## How It Works

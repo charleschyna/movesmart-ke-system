@@ -13,6 +13,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import './index.css';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 const App: React.FC = () => {
   return (
@@ -22,16 +23,16 @@ const App: React.FC = () => {
           <div className="App bg-background text-foreground min-h-screen">
             <Toaster position="top-right" reverseOrder={false} />
             <Router>
-              <Routes>
+<Routes>
                 <Route path="/" element={<Login />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/new-dashboard" element={<NewDashboard />} />
-                <Route path="/reports-page" element={<ReportsExports />} />
+                <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} requiredPerms={["traffic:read"]} />} />
+                <Route path="/new-dashboard" element={<ProtectedRoute element={<NewDashboard />} requiredPerms={["traffic:read"]} />} />
+                <Route path="/reports-page" element={<ProtectedRoute element={<ReportsExports />} requiredPerms={["reports:read"]} />} />
                 <Route path="/navbar-demo" element={<NavbarDemo />} />
-                <Route path="/incidents" element={<IncidentsPage />} />
-                <Route path="/notifications" element={<NotificationCenter />} />
+                <Route path="/incidents" element={<ProtectedRoute element={<IncidentsPage />} requiredPerms={["incidents:read"]} />} />
+                <Route path="/notifications" element={<ProtectedRoute element={<NotificationCenter />} />} />
               </Routes>
             </Router>
           </div>

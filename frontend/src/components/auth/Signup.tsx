@@ -1,4 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { UserIcon, EnvelopeIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
@@ -111,11 +114,11 @@ const Signup: React.FC = () => {
   // Removed custom handleGoogleLogin; using official rendered button only
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto rounded-full flex items-center justify-center mb-3 overflow-hidden" style={{ width: '60px', height: '60px' }}>
-            <img src="/NEW-removebg-preview.png" alt="MoveSmart KE Logo" className="object-contain" style={{ width: '60px', height: '60px' }} />
+          <div className="mx-auto rounded-full flex items-center justify-center mb-3 overflow-hidden" style={{ width: '128px', height: '128px' }}>
+            <img src="/NEW-removebg-preview.png" alt="MoveSmart KE Logo" className="object-contain" style={{ width: '128px', height: '128px' }} />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Sign Up to MoveSmart KE</h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -124,30 +127,21 @@ const Signup: React.FC = () => {
         </div>
         {/* Removed top Google button section to avoid duplicates */}
 
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gradient-to-br from-blue-50 via-white to-green-50 text-gray-500">Or continue with email</span>
-            </div>
-          </div>
-        </div>
-
-        <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700">
               Username
             </label>
-            <div className="mt-1">
+            <div className="relative">
+              <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 id="username"
                 name="username"
                 type="text"
                 autoComplete="username"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 value={formData.username}
                 onChange={handleInputChange}
               />
@@ -158,14 +152,15 @@ const Signup: React.FC = () => {
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email
             </label>
-            <div className="mt-1">
+            <div className="relative">
+              <EnvelopeIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 value={formData.email}
                 onChange={handleInputChange}
               />
@@ -176,14 +171,15 @@ const Signup: React.FC = () => {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               Password
             </label>
-            <div className="mt-1">
+            <div className="relative">
+              <LockClosedIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="new-password"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 value={formData.password}
                 onChange={handleInputChange}
               />
@@ -194,7 +190,7 @@ const Signup: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-lg ${
+              className={`w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg ${
                 loading ? 'opacity-50 cursor-not-allowed transform-none' : ''
               }`}
             >
@@ -212,15 +208,18 @@ const Signup: React.FC = () => {
 
         {/* Divider and single Google button at the bottom */}
         <div className="mt-6">
-          <div className="relative mb-4">
+          <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
+              <div className="w-full border-t border-gray-200" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gradient-to-br from-blue-50 via-white to-green-50 text-gray-500">Or continue with Google</span>
+              <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
             </div>
           </div>
-          <div ref={googleBtnRef} className="flex justify-center" />
+
+          <div className="mt-6">
+            <div ref={googleBtnRef} className="flex justify-center" />
+          </div>
         </div>
 
         <div className="text-center mt-4">
@@ -231,10 +230,10 @@ const Signup: React.FC = () => {
             </Link>
           </span>
         </div>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Signup;
-
